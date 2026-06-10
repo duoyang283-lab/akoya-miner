@@ -15,7 +15,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Pool;
 

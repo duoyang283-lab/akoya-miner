@@ -29,7 +29,7 @@ using Akoya.MinerCore;
 using Akoya.PearlGemm;
 using Akoya.Pool;
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 

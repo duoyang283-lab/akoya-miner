@@ -13,7 +13,7 @@
 // The pump injects RTT into `IRttSink` (typically `Metrics.SetPoolLatencyMs`).
 
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Pool;
 

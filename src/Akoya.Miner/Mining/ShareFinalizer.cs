@@ -3,7 +3,7 @@ using System.Threading.Channels;
 using Akoya.Mining;
 using Akoya.Miner.Observability;
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 

@@ -11,7 +11,7 @@ using Akoya.Miner.Observability;
 using Akoya.MinerCore;
 using Akoya.Mining;
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 

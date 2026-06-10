@@ -1,5 +1,5 @@
 using Akoya.Crypto;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 

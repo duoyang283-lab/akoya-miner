@@ -21,7 +21,7 @@
 using System.Threading.Channels;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Pool;
 

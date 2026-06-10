@@ -6,7 +6,7 @@
 // the outbound queue". Anything bigger (e.g. accessing MinerId, SessionToken)
 // belongs on MiningSession itself.
 
-using Pool.Proto.V2;
+using PearlPool.Proto.V2;
 
 namespace Akoya.Pool;
 
