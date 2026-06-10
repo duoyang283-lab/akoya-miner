@@ -235,8 +235,8 @@ RUN --mount=type=cache,id=apt-cache-node-worker-final,target=/var/cache/apt,shar
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tini bash procps curl gnupg && \
-    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflareclient.com/ any main" > /etc/apt/sources.list.d/cloudflare-client.list && \
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" > /etc/apt/sources.list.d/cloudflare-client.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends cloudflare-warp && \
     rm -rf /var/lib/apt/lists/*
