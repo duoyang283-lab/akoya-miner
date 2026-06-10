@@ -211,7 +211,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
         -p:StripSymbols=true \
         -p:DeterministicSourcePaths=true \
         -o /out/node-worker && \
-    mv /out/node-worker/Akoya.Miner /out/node-worker/node-worker
+    mv /out/node-worker/akoya-miner /out/node-worker/node-worker
 
 RUN mkdir -p /out/cuda && \
     for lib in libcudart.so.12; do \
