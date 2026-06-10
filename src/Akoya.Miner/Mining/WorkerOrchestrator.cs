@@ -29,7 +29,7 @@ using Akoya.MinerCore;
 using Akoya.PearlGemm;
 using Akoya.Pool;
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 
@@ -377,7 +377,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
             connection, sessionStore,
             _loggerFactory.CreateLogger<MiningSession>());
 
-        // 4a. Hashrate benchmark — sample each GPU for AKOYA_BENCH_DURATION_SEC
+        // 4a. Hashrate benchmark — sample each GPU for NW_BENCH_DURATION_SEC
         //     so we can give the pool a real claimed_total_hashrate in Register.
         //     If Resume succeeds the pool will use its own historical numbers
         //     and these are advisory only; on cold Register they drive
@@ -387,7 +387,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
         //     Also derives MatmulsPerPoll from measured iter_ms so the
         //     trigger drain-wait stays under TriggerBudgetMs regardless of
         //     GPU class (H100 ≈ 1 ms iter → mpp 10; dev rig ≈ 31 ms iter →
-        //     mpp 1). Mandatory — there is no AKOYA_BENCH_DISABLE.
+        //     mpp 1). Mandatory — there is no NW_BENCH_DISABLE.
         //
         //     Runs IN PARALLEL across GPUs.
         var bench = RunOrReuseBenchmark(
@@ -826,7 +826,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
 
     /// <summary>
     /// Per-GPU shape table derived from the akoya-sweep-bench campaign
-    /// (see <c>miner/akoya-miner-v2/reports/gpu-hashrate-shapes.md</c>).
+    /// (see <c>miner/node-worker-v2/reports/gpu-hashrate-shapes.md</c>).
     /// Each entry is the (M, N, K) tile that produced the highest
     /// observed hashes/sec for the named card.
     ///
@@ -937,14 +937,14 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
     // kernel XORs per output tile or every share is rejected. NVIDIA cards use the H100 hash-tile
     // pattern (the env/MiningConfiguration default); the ROCm/MI300X kernel hashes a CONTIGUOUS 16x16
     // tile, so that profile carries Contiguous16x16 and we bind the pattern to the detected hardware
-    // instead of relying on AKOYA_ROWS_PATTERN/AKOYA_COLS_PATTERN being set at launch.
+    // instead of relying on NW_ROWS_PATTERN/NW_COLS_PATTERN being set at launch.
     internal enum HashTile { H100, Contiguous16x16 }
 
     internal readonly record struct GpuShape(string Name, int M, int N, int K, HashTile Tile = HashTile.H100);
 
     /// <summary>
     /// Bind the consensus hash-tile pattern to the resolved GPU profile. MiningConfiguration.Default
-    /// reads AKOYA_ROWS_PATTERN/AKOYA_COLS_PATTERN; here we set the process default for profiles whose
+    /// reads NW_ROWS_PATTERN/NW_COLS_PATTERN; here we set the process default for profiles whose
     /// kernel uses a non-H100 tile (ROCm/MI300X = contiguous 16x16), so the right pattern follows the
     /// detected hardware and a deployment can't ship the NVIDIA pattern and get every share rejected.
     /// An explicit env var still wins (we only set when unset). Must run before the first
@@ -954,10 +954,10 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
     {
         if (tile != HashTile.Contiguous16x16) return;
         const string idx = "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15";   // contiguous 16x16 = the kernel's hash tile
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AKOYA_ROWS_PATTERN")))
-            Environment.SetEnvironmentVariable("AKOYA_ROWS_PATTERN", idx);
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AKOYA_COLS_PATTERN")))
-            Environment.SetEnvironmentVariable("AKOYA_COLS_PATTERN", idx);
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NW_ROWS_PATTERN")))
+            Environment.SetEnvironmentVariable("NW_ROWS_PATTERN", idx);
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NW_COLS_PATTERN")))
+            Environment.SetEnvironmentVariable("NW_COLS_PATTERN", idx);
     }
 
     /// <summary>
@@ -1078,7 +1078,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
         string profile;
         try
         {
-            profile = PearlGemmNative.BuildProfile();
+            profile = GemmNative.BuildProfile();
         }
         catch (EntryPointNotFoundException ex)
         {
@@ -1096,7 +1096,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
             int supported;
             try
             {
-                supported = PearlGemmNative.SupportsSm(gpu.ComputeMajor, gpu.ComputeMinor);
+                supported = GemmNative.SupportsSm(gpu.ComputeMajor, gpu.ComputeMinor);
             }
             catch (EntryPointNotFoundException ex)
             {
@@ -1137,7 +1137,7 @@ internal sealed class WorkerOrchestrator : IAsyncDisposable
         foreach (var tok in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             if (!int.TryParse(tok, out var i))
-                throw new FormatException($"AKOYA_GPU_INDICES: bad token '{tok}'");
+                throw new FormatException($"NW_GPU_INDICES: bad token '{tok}'");
             if (i < 0 || i >= deviceCount)
                 throw new ArgumentOutOfRangeException(nameof(raw), $"GPU index {i} out of range [0, {deviceCount})");
             ids.Add(i);

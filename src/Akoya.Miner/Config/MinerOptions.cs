@@ -6,8 +6,8 @@
 // locking.
 //
 // V2 deliberately does NOT include any of the deprecated v1 vars
-// (AKOYA_POOL_RECONNECT_*, AKOYA_POOL_FIRST_JOB_*, AKOYA_POOL_SHARE_STARVATION_*,
-// AKOYA_GATEWAY_*). Those still parse from the environment but only produce
+// (NW_POOL_RECONNECT_*, NW_POOL_FIRST_JOB_*, NW_POOL_SHARE_STARVATION_*,
+// NW_GATEWAY_*). Those still parse from the environment but only produce
 // a deprecation warning — see EnvVarBindings.WarnOnDeprecated.
 
 namespace Akoya.Miner.Config;
@@ -30,7 +30,7 @@ internal sealed record PoolOptions(
 
 /// <summary>
 /// GEMM / mining-loop parameters. Names + defaults match v1 1:1 — these are
-/// the AKOYA_MINE_* env vars that production HiveOS deployments set.
+/// the NW_MINE_* env vars that production HiveOS deployments set.
 /// </summary>
 internal sealed record MineOptions(
     int M,
@@ -51,7 +51,7 @@ internal sealed record MineOptions(
 
 /// <summary>
 /// GPU enumeration / selection. <c>IndicesRaw</c> is the raw value of
-/// <c>AKOYA_GPU_INDICES</c> (or legacy <c>AKOYA_GPU_INDEX</c>): "all" or
+/// <c>NW_GPU_INDICES</c> (or legacy <c>NW_GPU_INDEX</c>): "all" or
 /// comma-separated 0-based indices. Parsed into a concrete list by
 /// WorkerOrchestrator once we know the device count.
 /// </summary>
@@ -66,8 +66,8 @@ internal sealed record ObservabilityOptions(
 
 /// <summary>
 /// Session persistence. <c>FilePath</c> defaults to
-/// <c>$HOME/.akoya/session.json</c> (or
-/// <c>/root/.akoya/session.json</c> in container envs without $HOME).
+/// <c>$HOME/.nw/session.json</c> (or
+/// <c>/root/.nw/session.json</c> in container envs without $HOME).
 /// </summary>
 internal sealed record SessionOptions(string FilePath);
 

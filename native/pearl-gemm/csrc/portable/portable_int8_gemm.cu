@@ -21,7 +21,7 @@
 //   and consumes the same int32 scratch buffer.  Hence transcript bytes
 //   downstream are bit-identical.
 //
-// Build:  compiled into libpearl_gemm_capi.so via setup.py (portable
+// Build:  compiled into libgemm_capi.so via setup.py (portable
 // extension sources) and csrc/capi/Makefile.
 
 #include "../capi/portable_int8_helpers.h"

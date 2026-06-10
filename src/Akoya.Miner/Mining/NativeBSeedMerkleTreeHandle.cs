@@ -46,7 +46,7 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
             fixed (byte* pKey = key)
             fixed (byte* pRoot = root)
             {
-                int rc = PearlMiningNative.BSeedMerkleBuildTreeFromLeafCvs(
+                int rc = MiningNative.BSeedMerkleBuildTreeFromLeafCvs(
                     pLeafCvs,
                     (nuint)leafCvs.Length,
                     pBSeed,
@@ -69,7 +69,7 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
         }
         finally
         {
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -100,7 +100,7 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
     {
         if (_handle != null)
         {
-            PearlMiningNative.BSeedMerkleTreeFree(_handle);
+            MiningNative.BSeedMerkleTreeFree(_handle);
             _handle = null;
         }
         GC.SuppressFinalize(this);
@@ -120,7 +120,7 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
         {
             fixed (uint* pRows = rowIndices)
             {
-                int rc = PearlMiningNative.BSeedMerkleProofForHandle(
+                int rc = MiningNative.BSeedMerkleProofForHandle(
                     _handle,
                     pRows, (nuint)rowIndices.Length,
                     &leafDataPtr, &leafCount,
@@ -159,10 +159,10 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
         }
         finally
         {
-            if (leafDataPtr != null) PearlMiningNative.FreeBuffer(leafDataPtr, leafCount * Blake3.ChunkLen);
-            if (leafIdxPtr != null) PearlMiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibCount * Blake3.DigestSize);
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (leafDataPtr != null) MiningNative.FreeBuffer(leafDataPtr, leafCount * Blake3.ChunkLen);
+            if (leafIdxPtr != null) MiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibCount * Blake3.DigestSize);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -178,7 +178,7 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
         {
             fixed (uint* pIdx = leafIndices)
             {
-                int rc = PearlMiningNative.BSeedMerkleAuditPathsForHandle(
+                int rc = MiningNative.BSeedMerkleAuditPathsForHandle(
                     _handle,
                     pIdx, (nuint)leafIndices.Length,
                     &siblingsPtr, &sibBytes,
@@ -198,8 +198,8 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
         }
         finally
         {
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibBytes);
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibBytes);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -209,6 +209,6 @@ internal sealed class NativeBSeedMerkleTreeHandle : IMerkleTreeHandle, IDisposab
 
     ~NativeBSeedMerkleTreeHandle()
     {
-        unsafe { if (_handle != null) PearlMiningNative.BSeedMerkleTreeFree(_handle); }
+        unsafe { if (_handle != null) MiningNative.BSeedMerkleTreeFree(_handle); }
     }
 }

@@ -38,7 +38,7 @@ public static class MerkleProofFromLeafCvs
             fixed (uint* pRows = rowIndices)
             fixed (byte* pRoot = root)
             {
-                int rc = PearlMiningNative.MerkleProofFromLeafCvs(
+                int rc = MiningNative.MerkleProofFromLeafCvs(
                     pLeafCvs,
                     (nuint)leafCvs.Length,
                     pLeafData,
@@ -94,9 +94,9 @@ public static class MerkleProofFromLeafCvs
         }
         finally
         {
-            if (leafIdxPtr != null) PearlMiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibCount * DigestSize);
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (leafIdxPtr != null) MiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibCount * DigestSize);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 }

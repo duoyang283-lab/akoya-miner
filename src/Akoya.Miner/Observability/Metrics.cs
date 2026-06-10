@@ -236,64 +236,64 @@ internal static class Metrics
         var sb = new StringBuilder(4096);
         var inv = CultureInfo.InvariantCulture;
 
-        sb.Append("# HELP akoya_miner_info Build metadata.\n");
-        sb.Append("# TYPE akoya_miner_info gauge\n");
-        sb.Append("akoya_miner_info{git_sha=\"").Append(VersionInfo.GitSha).Append("\"} 1\n");
+        sb.Append("# HELP nw_info Build metadata.\n");
+        sb.Append("# TYPE nw_info gauge\n");
+        sb.Append("nw_info{git_sha=\"").Append(VersionInfo.GitSha).Append("\"} 1\n");
 
-        Counter(sb, "akoya_miner_iters_total",            "Total host-signal poll iterations.",     _iters);
-        Counter(sb, "akoya_miner_triggers_total",         "Total GPU triggers (tile met σ target).", _triggers);
-        Counter(sb, "akoya_miner_sigma_rotations_total",  "Total observed sigma installs or retargets.", _sigmaRotations);
+        Counter(sb, "nw_iters_total",            "Total host-signal poll iterations.",     _iters);
+        Counter(sb, "nw_triggers_total",         "Total GPU triggers (tile met σ target).", _triggers);
+        Counter(sb, "nw_sigma_rotations_total",  "Total observed sigma installs or retargets.", _sigmaRotations);
 
-        sb.Append("# HELP akoya_miner_blocks_submitted_total Submitted shares by pool result (V2: shares; V1: blocks).\n");
-        sb.Append("# TYPE akoya_miner_blocks_submitted_total counter\n");
+        sb.Append("# HELP nw_blocks_submitted_total Submitted shares by pool result (V2: shares; V1: blocks).\n");
+        sb.Append("# TYPE nw_blocks_submitted_total counter\n");
         for (int g = 0; g < _gpuCount; g++)
         {
-            sb.Append("akoya_miner_blocks_submitted_total{gpu=\"").Append(g).Append("\",result=\"accepted\"} ")
+            sb.Append("nw_blocks_submitted_total{gpu=\"").Append(g).Append("\",result=\"accepted\"} ")
               .Append(Volatile.Read(ref _blocksAccepted[g]).ToString(inv)).Append('\n');
-            sb.Append("akoya_miner_blocks_submitted_total{gpu=\"").Append(g).Append("\",result=\"rejected\"} ")
+            sb.Append("nw_blocks_submitted_total{gpu=\"").Append(g).Append("\",result=\"rejected\"} ")
               .Append(Volatile.Read(ref _blocksRejected[g]).ToString(inv)).Append('\n');
         }
 
-        Gauge(sb, "akoya_miner_iters_per_second",  "Per-worker iterations per second (gauge).", _itersPerSec);
-        Gauge(sb, "akoya_miner_tmads_per_second",  "Per-worker TMADs/s (gauge).",                _tmadsPerSec);
-        Gauge(sb, "akoya_miner_hashes_per_second", "Per-worker hashes/s (gauge, tiles*DAF).",    _hashesPerSec);
-        Gauge(sb, "akoya_miner_expected_opens_per_second", "Per-worker expected opens/s at current adjusted target.", _expectedOpensPerSec);
-        Gauge(sb, "akoya_miner_tiles_per_second",  "Per-worker CTA output tiles/s (diagnostic; target-normalized opens track TMADs/s).", _tilesPerSec);
-        Gauge(sb, "akoya_miner_iter_ms",           "Per-worker mean iteration latency (ms).",    _iterMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_latest_ms", "Latest worker-observed sigma rotation wall time from job observation to first new batch queued.", _sigmaRotationLatestMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_max_ms", "Maximum worker-observed sigma rotation wall time in this process.", _sigmaRotationMaxMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_drain_ms", "Latest old-batch drain time before sigma install.", _sigmaRotationDrainMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_install_ms", "Latest sigma install time excluding old-batch drain and first queue.", _sigmaRotationInstallMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_b_merkle_ms", "Latest B Merkle handle build time during sigma install.", _sigmaRotationBMerkleMs);
-        Gauge(sb, "akoya_miner_sigma_rotation_lost_iters", "Latest sigma rotation time expressed as mean iterations lost.", _sigmaRotationLostIters);
-        Gauge(sb, "akoya_miner_sigma_rotation_bseed_changed", "1 if the latest sigma rotation changed BSeed, else 0.", _sigmaRotationBSeedChanged);
+        Gauge(sb, "nw_iters_per_second",  "Per-worker iterations per second (gauge).", _itersPerSec);
+        Gauge(sb, "nw_tmads_per_second",  "Per-worker TMADs/s (gauge).",                _tmadsPerSec);
+        Gauge(sb, "nw_hashes_per_second", "Per-worker hashes/s (gauge, tiles*DAF).",    _hashesPerSec);
+        Gauge(sb, "nw_expected_opens_per_second", "Per-worker expected opens/s at current adjusted target.", _expectedOpensPerSec);
+        Gauge(sb, "nw_tiles_per_second",  "Per-worker CTA output tiles/s (diagnostic; target-normalized opens track TMADs/s).", _tilesPerSec);
+        Gauge(sb, "nw_iter_ms",           "Per-worker mean iteration latency (ms).",    _iterMs);
+        Gauge(sb, "nw_sigma_rotation_latest_ms", "Latest worker-observed sigma rotation wall time from job observation to first new batch queued.", _sigmaRotationLatestMs);
+        Gauge(sb, "nw_sigma_rotation_max_ms", "Maximum worker-observed sigma rotation wall time in this process.", _sigmaRotationMaxMs);
+        Gauge(sb, "nw_sigma_rotation_drain_ms", "Latest old-batch drain time before sigma install.", _sigmaRotationDrainMs);
+        Gauge(sb, "nw_sigma_rotation_install_ms", "Latest sigma install time excluding old-batch drain and first queue.", _sigmaRotationInstallMs);
+        Gauge(sb, "nw_sigma_rotation_b_merkle_ms", "Latest B Merkle handle build time during sigma install.", _sigmaRotationBMerkleMs);
+        Gauge(sb, "nw_sigma_rotation_lost_iters", "Latest sigma rotation time expressed as mean iterations lost.", _sigmaRotationLostIters);
+        Gauge(sb, "nw_sigma_rotation_bseed_changed", "1 if the latest sigma rotation changed BSeed, else 0.", _sigmaRotationBSeedChanged);
 
-        sb.Append("# HELP akoya_miner_block_finds_total Shares that the pool flagged is_block_find=true.\n");
-        sb.Append("# TYPE akoya_miner_block_finds_total counter\n");
-        sb.Append("akoya_miner_block_finds_total ").Append(Volatile.Read(ref _blockFinds).ToString(inv)).Append('\n');
+        sb.Append("# HELP nw_block_finds_total Shares that the pool flagged is_block_find=true.\n");
+        sb.Append("# TYPE nw_block_finds_total counter\n");
+        sb.Append("nw_block_finds_total ").Append(Volatile.Read(ref _blockFinds).ToString(inv)).Append('\n');
 
         if (_heartbeatTicks.Length > 0)
         {
-            sb.Append("# HELP akoya_miner_heartbeat_age_seconds Wall seconds since worker last ticked.\n");
-            sb.Append("# TYPE akoya_miner_heartbeat_age_seconds gauge\n");
+            sb.Append("# HELP nw_heartbeat_age_seconds Wall seconds since worker last ticked.\n");
+            sb.Append("# TYPE nw_heartbeat_age_seconds gauge\n");
             long nowTicks = DateTime.UtcNow.Ticks;
             for (int g = 0; g < _gpuCount; g++)
             {
                 long hb = Interlocked.Read(ref _heartbeatTicks[g]);
                 double ageSec = hb == 0 ? 0.0 : (nowTicks - hb) / (double)TimeSpan.TicksPerSecond;
-                sb.Append("akoya_miner_heartbeat_age_seconds{gpu=\"").Append(g).Append("\"} ")
+                sb.Append("nw_heartbeat_age_seconds{gpu=\"").Append(g).Append("\"} ")
                   .Append(ageSec.ToString("F3", inv)).Append('\n');
             }
         }
 
-        sb.Append("# HELP akoya_miner_pool_connected 1 if the gRPC MiningStream is currently open, 0 otherwise.\n");
-        sb.Append("# TYPE akoya_miner_pool_connected gauge\n");
-        sb.Append("akoya_miner_pool_connected ").Append(Interlocked.Read(ref _poolConnected).ToString(inv)).Append('\n');
+        sb.Append("# HELP nw_pool_connected 1 if the gRPC MiningStream is currently open, 0 otherwise.\n");
+        sb.Append("# TYPE nw_pool_connected gauge\n");
+        sb.Append("nw_pool_connected ").Append(Interlocked.Read(ref _poolConnected).ToString(inv)).Append('\n');
 
-        sb.Append("# HELP akoya_miner_pool_latency_ms Last Ping/Pong round-trip time in milliseconds.\n");
-        sb.Append("# TYPE akoya_miner_pool_latency_ms gauge\n");
+        sb.Append("# HELP nw_pool_latency_ms Last Ping/Pong round-trip time in milliseconds.\n");
+        sb.Append("# TYPE nw_pool_latency_ms gauge\n");
         double rtt = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _poolLatencyMsBits));
-        sb.Append("akoya_miner_pool_latency_ms ")
+        sb.Append("nw_pool_latency_ms ")
           .Append(double.IsFinite(rtt) ? rtt.ToString("F3", inv) : "0").Append('\n');
 
         return sb.ToString();

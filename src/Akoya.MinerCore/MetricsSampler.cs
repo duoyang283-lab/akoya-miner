@@ -13,7 +13,7 @@
 //     Queries all visible GPUs (multi-row CSV output).
 //
 // Why nvidia-smi rather than NVML P/Invoke: avoids an extra native dep,
-// works inside the akoya-miner Native-AOT binary without binding gymnastics.
+// works inside the node-worker Native-AOT binary without binding gymnastics.
 // 1 Hz polling has negligible perf impact.
 
 using System.Diagnostics;

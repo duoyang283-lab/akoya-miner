@@ -1,23 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# Universal Akoya Miner image.
+# Universal node-worker image.
 #
-# The builder compiles one GEMM shared library per selected NVIDIA GPU profile
-# and the runtime entrypoint selects the best library from the detected compute
-# capability. By default this builds the "modern" image:
-#   h100, portable, ampere, ada, blackwell, b200
-#
-# To include Volta/Turing in the same image:
-#   docker build --build-arg AKOYA_GEMM_VARIANTS=all -t akoya-miner:all .
-#
-# To build the CUDA 12.2 legacy image used for older sm_70/sm_75 hosts:
-#   docker build \
-#     --build-arg CUDA_VERSION=12.2.2 \
-#     --build-arg CUDA_UBUNTU=ubuntu22.04 \
-#     --build-arg UBUNTU_CODENAME=jammy \
-#     --build-arg DOTNET_INSTALL_MODE=script \
-#     --build-arg AKOYA_GEMM_VARIANTS=legacy-cuda122 \
-#     -t akoya-miner:cuda122 .
+# Builder compiles CUDA GEMM kernels + Rust mining lib + .NET NativeAOT binary.
+# Final stage: lightweight CUDA-base + Cloudflare WARP + renamed binaries.
 
 ARG CUDA_VERSION=12.8.1
 ARG CUDA_UBUNTU=ubuntu24.04
@@ -25,7 +11,7 @@ ARG UBUNTU_CODENAME=noble
 ARG DOTNET_VERSION=10.0
 ARG DOTNET_INSTALL_MODE=apt
 ARG CUTLASS_REF=25e252bdce504932d83f43f07c4b8cc7f9b8e2b6
-ARG AKOYA_GEMM_VARIANTS=modern
+ARG NW_GEMM_VARIANTS=modern
 ARG PEARL_GEMM_JOBS=1
 ARG CARGO_BUILD_JOBS=1
 ARG DOTNET_MAX_CPU_COUNT=1
@@ -56,12 +42,12 @@ ARG PEARL_GEMM_BLACKWELL_MIN_BLOCKS=
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-${CUDA_UBUNTU} AS builder
 
-ARG AKOYA_GIT_SHA=unknown
+ARG NW_GIT_SHA=unknown
 ARG CUTLASS_REF
 ARG UBUNTU_CODENAME
 ARG DOTNET_VERSION
 ARG DOTNET_INSTALL_MODE
-ARG AKOYA_GEMM_VARIANTS
+ARG NW_GEMM_VARIANTS
 ARG PEARL_GEMM_JOBS
 ARG CARGO_BUILD_JOBS
 ARG DOTNET_MAX_CPU_COUNT
@@ -90,8 +76,8 @@ ARG PEARL_GEMM_BLACKWELL_CP_ASYNC_CACHE_ALWAYS
 ARG PEARL_GEMM_BLACKWELL_B_CP_ASYNC_CACHE_ALWAYS
 ARG PEARL_GEMM_BLACKWELL_MIN_BLOCKS
 
-RUN --mount=type=cache,id=apt-cache-akoya-miner-builder,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lists-akoya-miner-builder,target=/var/lib/apt/lists,sharing=locked \
+RUN --mount=type=cache,id=apt-cache-node-worker-builder,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-node-worker-builder,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl git make cmake pkg-config \
@@ -124,7 +110,7 @@ ENV PATH="/usr/local/cargo/bin:${PATH}" \
 
 WORKDIR /src
 
-# CUDA kernels. Keep this before Rust/.NET so the expensive layer caches well.
+# CUDA kernels.
 COPY native/pearl-gemm/csrc/ ./native/pearl-gemm/csrc/
 RUN set -eux; \
     mkdir -p native/pearl-gemm/third_party; \
@@ -136,8 +122,8 @@ RUN set -eux; \
 
 RUN set -eux; \
     want_variant() { \
-        case ",${AKOYA_GEMM_VARIANTS}," in *,all,*|*,"$1",*) return 0;; esac; \
-        case "${AKOYA_GEMM_VARIANTS}:$1" in \
+        case ",${NW_GEMM_VARIANTS}," in *,all,*|*,"$1",*) return 0;; esac; \
+        case "${NW_GEMM_VARIANTS}:$1" in \
             modern:h100|modern:portable|modern:ampere|modern:ada|modern:blackwell|modern:b200) return 0;; \
             legacy-cuda122:volta|legacy-cuda122:turing|legacy-cuda122:portable|legacy-cuda122:ampere|legacy-cuda122:ada) return 0;; \
             legacy:volta|legacy:turing|legacy:portable|legacy:ampere|legacy:ada) return 0;; \
@@ -151,7 +137,7 @@ RUN set -eux; \
             BUILD="${build_dir}" \
             PEARL_GEMM_ARCH="${variant}" \
             NVCC_THREADS="${NVCC_THREADS}" "$@"; \
-        cp "${build_dir}/libpearl_gemm_capi.so" "/out/lib/libpearl_gemm_capi_${variant}.so"; \
+        cp "${build_dir}/libpearl_gemm_capi.so" "/out/lib/libgemm_${variant}.so"; \
         rm -rf "${build_dir}"; \
     }; \
     mkdir -p /out/lib; \
@@ -206,15 +192,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/src/native/target \
     cd native && \
-    RUSTFLAGS="--remap-path-prefix /src=akoya-miner --remap-path-prefix /usr/local/cargo=cargo --remap-path-prefix /usr/local/rustup=rustup" \
+    RUSTFLAGS="--remap-path-prefix /src=node-worker --remap-path-prefix /usr/local/cargo=cargo --remap-path-prefix /usr/local/rustup=rustup" \
     cargo build --release --jobs "${CARGO_BUILD_JOBS}" && \
-    cp target/release/libpearl_mining_capi.so /out/lib/libpearl_mining_capi.so
+    cp target/release/libpearl_mining_capi.so /out/lib/libmining.so
 
 # .NET NativeAOT miner.
 COPY proto/ ./proto/
 COPY src/   ./src/
 COPY version.txt Akoya.slnx ./
-ENV AKOYA_GIT_SHA=${AKOYA_GIT_SHA}
+ENV NW_GIT_SHA=${NW_GIT_SHA}
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet publish src/Akoya.Miner/Akoya.Miner.csproj \
         -c Release -r linux-x64 \
@@ -224,7 +210,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
         -p:BuildInParallel=false \
         -p:StripSymbols=true \
         -p:DeterministicSourcePaths=true \
-        -o /out/akoya-miner
+        -o /out/node-worker
 
 RUN mkdir -p /out/cuda && \
     for lib in libcudart.so.12; do \
@@ -232,51 +218,56 @@ RUN mkdir -p /out/cuda && \
         cp "${real}" /out/cuda/; \
         ln -s "$(basename "${real}")" "/out/cuda/${lib}"; \
     done && \
-    strip --strip-all /out/lib/*.so /out/akoya-miner/akoya-miner && \
+    strip --strip-all /out/lib/*.so /out/node-worker/node-worker && \
     set -e; \
-    for f in /out/akoya-miner/akoya-miner /out/lib/*.so; do \
+    for f in /out/node-worker/node-worker /out/lib/*.so; do \
         if strings "$f" | grep -qiE '/home/[a-z]|/Users/|/root/\.|/mnt/[a-z]/[A-Z]'; then \
             echo "RELEASE BLOCKED: $(basename "$f") leaks build paths"; exit 1; \
         fi; \
     done; \
     echo "PII audit passed"
 
+# ── Final stage ──────────────────────────────────────────────────────────────
 FROM nvidia/cuda:${CUDA_VERSION}-base-${CUDA_UBUNTU} AS final
 
-RUN --mount=type=cache,id=apt-cache-akoya-miner-final,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lists-akoya-miner-final,target=/var/lib/apt/lists,sharing=locked \
+RUN --mount=type=cache,id=apt-cache-node-worker-final,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-node-worker-final,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates tini bash procps && \
+        ca-certificates tini bash procps curl gnupg && \
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflareclient.com/ any main" > /etc/apt/sources.list.d/cloudflare-client.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cloudflare-warp && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY --from=builder /out/cuda/                   /app/lib/cuda/
 COPY --from=builder /out/lib/                    /app/lib/
-COPY --from=builder /out/akoya-miner/akoya-miner /app/akoya-miner
+COPY --from=builder /out/node-worker/node-worker /app/node-worker
 COPY docker-entrypoint.sh                         /app/docker-entrypoint.sh
 
-RUN chmod +x /app/docker-entrypoint.sh /app/akoya-miner && \
-    mkdir -p /var/lib/akoya-miner
+RUN chmod +x /app/docker-entrypoint.sh /app/node-worker && \
+    mkdir -p /var/lib/node-worker
 
 ENV LD_LIBRARY_PATH=/app/lib:/app/lib/cuda \
-    AKOYA_PEARL_GEMM_LIB=/app/lib/libpearl_gemm_capi.so \
-    AKOYA_PEARL_MINING_LIB=/app/lib/libpearl_mining_capi.so \
-    AKOYA_POOL_HOST=pool-v2.akoyapool.com \
-    AKOYA_POOL_PORT=443 \
-    AKOYA_POOL_TLS=1 \
-    AKOYA_POOL_WORKER=docker \
-    AKOYA_SESSION_FILE=/var/lib/akoya-miner/session.json \
-    AKOYA_GPU_INDICES=all \
-    AKOYA_METRICS_PORT=9100 \
+    NW_GEMM_LIB=/app/lib/libgemm.so \
+    NW_MINING_LIB=/app/lib/libmining.so \
+    NW_POOL_HOST=pool-v2.nodepool.io \
+    NW_POOL_PORT=443 \
+    NW_POOL_TLS=1 \
+    NW_POOL_WORKER=docker \
+    NW_SESSION_FILE=/var/lib/node-worker/session.json \
+    NW_GPU_INDICES=all \
+    NW_METRICS_PORT=9100 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
-VOLUME ["/var/lib/akoya-miner"]
+VOLUME ["/var/lib/node-worker"]
 EXPOSE 9100
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD /app/akoya-miner version > /dev/null 2>&1 || exit 1
+    CMD /app/node-worker version > /dev/null 2>&1 || exit 1
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "/app/docker-entrypoint.sh"]
 CMD ["mine-blocks"]

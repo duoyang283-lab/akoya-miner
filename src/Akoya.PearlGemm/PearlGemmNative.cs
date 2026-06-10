@@ -7,33 +7,33 @@ using System.Runtime.InteropServices;
 
 namespace Akoya.PearlGemm;
 
-public static partial class PearlGemmNative
+public static partial class GemmNative
 {
-    public const string Lib = "pearl_gemm_capi";
+    public const string Lib = "gemm";
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_abi_version")]
+    [LibraryImport(Lib, EntryPoint = "capi_abi_version")]
     public static partial int AbiVersion();
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_build_profile")]
+    [LibraryImport(Lib, EntryPoint = "capi_build_profile")]
     public static partial nint BuildProfilePtr();
 
     public static string BuildProfile()
         => Marshal.PtrToStringUTF8(BuildProfilePtr()) ?? "unknown";
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_supports_sm")]
+    [LibraryImport(Lib, EntryPoint = "capi_supports_sm")]
     public static partial int SupportsSm(int major, int minor);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_get_host_signal_sync_size")]
+    [LibraryImport(Lib, EntryPoint = "capi_get_host_signal_sync_size")]
     public static partial int GetHostSignalSyncSize();
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_get_host_signal_header_size")]
+    [LibraryImport(Lib, EntryPoint = "capi_get_host_signal_header_size")]
     public static partial int GetHostSignalHeaderSize();
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_get_required_scratchpad_bytes")]
+    [LibraryImport(Lib, EntryPoint = "capi_get_required_scratchpad_bytes")]
     public static partial long GetRequiredScratchpadBytes(long matrixBytes, int threadsPerBlock);
 
     // tensor_hash: data, key, out, roots are all device pointers.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_tensor_hash")]
+    [LibraryImport(Lib, EntryPoint = "capi_tensor_hash")]
     public static partial int TensorHash(
         nint data, uint dataSize,
         nint outHash,
@@ -46,7 +46,7 @@ public static partial class PearlGemmNative
         int deviceId,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_tensor_hash_leaf_cvs")]
+    [LibraryImport(Lib, EntryPoint = "capi_tensor_hash_leaf_cvs")]
     public static partial int TensorHashLeafCvs(
         nint data, uint dataSize,
         nint outHash,
@@ -62,7 +62,7 @@ public static partial class PearlGemmNative
 
     // Fused BSeed expansion + tensor_hash for B-state install. bSeed is a
     // pinned host pointer; data/outHash/key/roots are device pointers.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_and_tensor_hash")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_and_tensor_hash")]
     public static unsafe partial int BSeedExpandAndTensorHash(
         byte* bSeed,
         nint data,
@@ -77,7 +77,7 @@ public static partial class PearlGemmNative
         int deviceId,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_and_tensor_hash_leaf_cvs")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_and_tensor_hash_leaf_cvs")]
     public static unsafe partial int BSeedExpandAndTensorHashLeafCvs(
         byte* bSeed,
         nint data,
@@ -93,7 +93,7 @@ public static partial class PearlGemmNative
         int deviceId,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_commitment_hash_from_merkle_roots")]
+    [LibraryImport(Lib, EntryPoint = "capi_commitment_hash_from_merkle_roots")]
     public static partial int CommitmentHashFromMerkleRoots(
         nint aMerkleRoot, nint bMerkleRoot,
         nint key,
@@ -101,7 +101,7 @@ public static partial class PearlGemmNative
         int deviceId,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_noise_gen")]
+    [LibraryImport(Lib, EntryPoint = "capi_noise_gen")]
     public static partial int NoiseGen(
         int r,
         int m, int n, int k,
@@ -122,7 +122,7 @@ public static partial class PearlGemmNative
         public nint Workspace;
     }
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_noise_B")]
+    [LibraryImport(Lib, EntryPoint = "capi_noise_B")]
     public static unsafe partial int NoiseB(NoiseBParams* p, nint stream);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -155,7 +155,7 @@ public static partial class PearlGemmNative
         public nint LeafCvs;
     }
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_install_B")]
+    [LibraryImport(Lib, EntryPoint = "capi_install_B")]
     public static unsafe partial int InstallB(InstallBParams* p, nint stream);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -174,34 +174,34 @@ public static partial class PearlGemmNative
         public nint Workspace;
     }
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_noisy_gemm")]
+    [LibraryImport(Lib, EntryPoint = "capi_noisy_gemm")]
     public static unsafe partial int NoisyGemm(NoisyGemmParams* p, nint stream);
 
     // ABI v2: per-σ workspace pool. Allocate once after noise_gen at
     // σ-refresh, pass the handle through every NoiseB / NoisyGemm call, free
     // on σ-rotation. Saves the per-iter cudaMallocAsync/Free pair inside the
     // portable noisy_gemm path (measured ~+10 % on RTX 3080 / 5090).
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_workspace_alloc")]
+    [LibraryImport(Lib, EntryPoint = "capi_workspace_alloc")]
     public static unsafe partial int WorkspaceAlloc(
         int m, int n, int k, int r,
         int withNoiseA, int withNoiseB,
         nint* outWorkspace, nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_workspace_free")]
+    [LibraryImport(Lib, EntryPoint = "capi_workspace_free")]
     public static partial int WorkspaceFree(nint workspace, nint stream);
 
     // Deterministic int7 ([-63, +63]) device fill, keyed by (seedLo, seedHi).
     // Host replay lives in Akoya.Crypto.LcgInt7 — both are byte-identical so
     // proof-time A recovery does not need to keep snapshot buffers around.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_lcg_int7_fill")]
+    [LibraryImport(Lib, EntryPoint = "capi_lcg_int7_fill")]
     public static partial int LcgInt7Fill(nint dst, long n, ulong seedLo, ulong seedHi, nint stream);
 
     // BSeed XOF expansion directly into a device buffer. bSeed is a pinned
     // host pointer to the 32-byte seed; dst is a device pointer.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_raw_device")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_raw_device")]
     public static unsafe partial int BSeedExpandRawDevice(byte* bSeed, nint dst, long n, nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_range_raw_device")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_range_raw_device")]
     public static unsafe partial int BSeedExpandRangeRawDevice(
         byte* bSeed,
         ulong byteOffset,
@@ -248,7 +248,7 @@ public static partial class PearlGemmNative
 
     // Install constant per-σ params into the workspace.  Must be called before
     // the first Iter() call.  Safe to call again on σ-rotation.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_workspace_install_params")]
+    [LibraryImport(Lib, EntryPoint = "capi_workspace_install_params")]
     public static unsafe partial int WorkspaceInstallParams(nint workspace, WorkspaceParams* p);
 
     // Per-iteration hot path — replaces 5 separate CAPI calls per iter.
@@ -256,13 +256,13 @@ public static partial class PearlGemmNative
     // noise_gen_A → noisy_gemm, reading all constants from the installed params.
     // Only seedLo (nonce counter) and hostSignalHeaderPinned (pinned host slot)
     // change between iterations.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_iter")]
+    [LibraryImport(Lib, EntryPoint = "capi_iter")]
     public static partial int Iter(nint workspace, ulong seedLo, nint hostSignalHeaderPinned, nint stream);
 
     // Batched variant of Iter(): launches `count` consecutive nonces starting
     // at seedLoStart, using hostSignalHeaderPinnedBatch[i] as the pinned slot
     // for iter i. Reduces managed/native transition overhead in QueueBatch.
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_iter_batch")]
+    [LibraryImport(Lib, EntryPoint = "capi_iter_batch")]
     public static unsafe partial int IterBatch(
         nint workspace,
         ulong seedLoStart,
@@ -270,14 +270,14 @@ public static partial class PearlGemmNative
         int count,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_iter_batch_graph_prepare")]
+    [LibraryImport(Lib, EntryPoint = "capi_iter_batch_graph_prepare")]
     public static unsafe partial int IterBatchGraphPrepare(
         nint workspace,
         nint* hostSignalHeaderPinnedBatch,
         int count,
         nint stream);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_iter_batch_graph_launch")]
+    [LibraryImport(Lib, EntryPoint = "capi_iter_batch_graph_launch")]
     public static partial int IterBatchGraphLaunch(
         nint workspace,
         ulong seedLoStart,

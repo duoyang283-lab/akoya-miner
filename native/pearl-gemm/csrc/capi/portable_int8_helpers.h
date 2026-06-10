@@ -1,4 +1,4 @@
-// Torch-free portable helpers used by libpearl_gemm_capi.so when built with
+// Torch-free portable helpers used by libgemm_capi.so when built with
 // PEARL_GEMM_ARCH=portable. Replaces the at::_int_mm + ATen elementwise
 // pieces of csrc/gemm/pearl_gemm_api.cpp's portable impls with native int8
 // GEMM + tiny custom CUDA kernels.

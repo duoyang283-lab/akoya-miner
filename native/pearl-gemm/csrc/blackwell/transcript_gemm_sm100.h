@@ -1,5 +1,5 @@
 // Host launcher for the Blackwell (sm_100a) tcgen05/TMEM transcript GEMM.
-// Implemented in transcript_gemm_sm100.cu; built into libpearl_gemm_capi.so
+// Implemented in transcript_gemm_sm100.cu; built into libgemm_capi.so
 // for PEARL_GEMM_ARCH=b200.  See transcript_gemm_sm100.cu for the design.
 #pragma once
 

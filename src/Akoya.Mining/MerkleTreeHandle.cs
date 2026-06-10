@@ -80,7 +80,7 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
     {
         if (_handle != null)
         {
-            PearlMiningNative.MerkleTreeFree(_handle);
+            MiningNative.MerkleTreeFree(_handle);
             _handle = null;
         }
         GC.SuppressFinalize(this);
@@ -111,7 +111,7 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
             fixed (byte* pKey = key)
             fixed (byte* pRoot = root)
             {
-                rc = PearlMiningNative.MerkleBuildTree(
+                rc = MiningNative.MerkleBuildTree(
                     pData, (nuint)data.Length,
                     pKey,
                     (nuint)rowWidth,
@@ -131,7 +131,7 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         }
         finally
         {
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -155,7 +155,7 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         {
             fixed (uint* pRows = rowIndices)
             {
-                rc = PearlMiningNative.MerkleProofForHandle(
+                rc = MiningNative.MerkleProofForHandle(
                     _handle,
                     pRows, (nuint)rowIndices.Length,
                     &leafDataPtr, &leafCount,
@@ -196,10 +196,10 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         }
         finally
         {
-            if (leafDataPtr != null) PearlMiningNative.FreeBuffer(leafDataPtr, leafCount * 1024);
-            if (leafIdxPtr != null) PearlMiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibCount * 32);
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (leafDataPtr != null) MiningNative.FreeBuffer(leafDataPtr, leafCount * 1024);
+            if (leafIdxPtr != null) MiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibCount * 32);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -229,7 +229,7 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         {
             fixed (uint* pIdx = leafIndices)
             {
-                rc = PearlMiningNative.MerkleAuditPathsForHandle(
+                rc = MiningNative.MerkleAuditPathsForHandle(
                     _handle,
                     pIdx, (nuint)leafIndices.Length,
                     &siblingsPtr, &sibBytes,
@@ -251,8 +251,8 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         }
         finally
         {
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibBytes);
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibBytes);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -272,6 +272,6 @@ public sealed class MerkleTreeHandle : IMerkleTreeHandle, IDisposable
         // Safety net for leaks: if the refcount machinery was bypassed
         // (e.g. an Acquire without a paired Release), the GC finalizer
         // still frees the native handle.
-        unsafe { if (_handle != null) PearlMiningNative.MerkleTreeFree(_handle); }
+        unsafe { if (_handle != null) MiningNative.MerkleTreeFree(_handle); }
     }
 }

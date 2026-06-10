@@ -11,14 +11,14 @@
 //! # Memory ownership
 //!
 //! Functions that allocate an output buffer hand ownership to the caller, who
-//! MUST release it with `pearl_capi_free_buffer` / `pearl_capi_free_u32_buffer`
-//! / `pearl_capi_free_string` as documented per function.
+//! MUST release it with `capi_free_buffer` / `capi_free_u32_buffer`
+//! / `capi_free_string` as documented per function.
 //!
 //! # Errors
 //!
 //! On error: returns non-zero, sets output pointers to NULL / length 0, and
 //! writes a NUL-terminated message to `*err_msg_ptr` (caller frees with
-//! `pearl_capi_free_string`). On success: returns 0, `err_msg_ptr` is left
+//! `capi_free_string`). On success: returns 0, `err_msg_ptr` is left
 //! untouched.
 
 use std::collections::BTreeSet;
@@ -27,9 +27,9 @@ use pearl_blake3::{pad_to_chunk_boundary, padded_chunk_len, Blake3Hasher, Merkle
 
 // Error codes mirror the layout used by `libpearl_gemm_capi.so` so the C#
 // side can keep its existing `CheckResult(int)` helper.
-const PEARL_CAPI_OK: c_int = 0;
-const PEARL_CAPI_ERR_BAD_ARG: c_int = 1;
-const PEARL_CAPI_ERR_INTERNAL: c_int = 2;
+const CAPI_OK: c_int = 0;
+const CAPI_ERR_BAD_ARG: c_int = 1;
+const CAPI_ERR_INTERNAL: c_int = 2;
 
 fn set_err(err_msg_ptr: *mut *mut c_char, msg: impl Into<String>) {
     if err_msg_ptr.is_null() {
@@ -72,11 +72,11 @@ fn map_xof_bytes_to_int7(out: &mut [u8]) {
 }
 
 /// Free a byte buffer previously allocated and returned by one of the
-/// `pearl_capi_*` functions in this library. `len` must be the exact length
+/// `capi_*` functions in this library. `len` must be the exact length
 /// returned alongside the pointer; the `Box::from_raw_parts` call below
 /// relies on it.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_free_buffer(ptr: *mut u8, len: usize) {
+pub unsafe extern "C" fn capi_free_buffer(ptr: *mut u8, len: usize) {
     if ptr.is_null() || len == 0 {
         return;
     }
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn pearl_capi_free_buffer(ptr: *mut u8, len: usize) {
 
 /// Free a NUL-terminated error string previously produced by this library.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn capi_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
@@ -106,9 +106,9 @@ pub unsafe extern "C" fn pearl_capi_free_string(ptr: *mut c_char) {
 ///
 /// History:
 ///   1 — initial release.
-///   2 — added `pearl_capi_merkle_root_and_proof`.
+///   2 — added `capi_merkle_root_and_proof`.
 #[no_mangle]
-pub extern "C" fn pearl_capi_version() -> u32 {
+pub extern "C" fn capi_version() -> u32 {
     2
 }
 
@@ -122,7 +122,7 @@ pub extern "C" fn pearl_capi_version() -> u32 {
 /// `data_ptr` may be NULL iff `data_len == 0`.
 /// `key_ptr` and `out` MUST be 32-byte buffers.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_blake3_keyed(
+pub unsafe extern "C" fn capi_blake3_keyed(
     data_ptr: *const u8,
     data_len: usize,
     key_ptr: *const u8,
@@ -148,9 +148,9 @@ pub unsafe extern "C" fn pearl_capi_blake3_keyed(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during blake3_keyed"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during blake3_keyed"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -159,7 +159,7 @@ pub unsafe extern "C" fn pearl_capi_blake3_keyed(
 /// `data_ptr` / `data_len` — raw matrix bytes (padded to chunk boundary by caller).
 /// `key_ptr` — 32-byte key.  `out_root` — caller-allocated 32-byte buffer.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_root(
+pub unsafe extern "C" fn capi_merkle_root(
     data_ptr: *const u8,
     data_len: usize,
     key_ptr: *const u8,
@@ -185,9 +185,9 @@ pub unsafe extern "C" fn pearl_capi_merkle_root(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_root"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_root"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn pearl_capi_merkle_root(
 /// * `key_ptr`    — pointer to the 32-byte job key.
 /// * `out_root`   — caller-allocated 32-byte buffer for the Merkle root.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_expand_and_merkle(
+pub unsafe extern "C" fn capi_bseed_expand_and_merkle(
     bseed_ptr: *const u8,
     n: usize,
     k: usize,
@@ -247,23 +247,23 @@ pub unsafe extern "C" fn pearl_capi_bseed_expand_and_merkle(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_and_merkle"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_and_merkle"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// BSeed XOF expansion + int7 mapping into a caller-owned row-major B buffer.
 ///
 /// Byte-for-byte equivalent to the expansion half of
-/// `pearl_capi_bseed_expand_and_merkle`, without padding or Merkle hashing.
+/// `capi_bseed_expand_and_merkle`, without padding or Merkle hashing.
 /// This is used by miners that need the expanded B matrix for GPU upload.
 ///
 /// * `bseed_ptr` — pointer to a 32-byte BSeed (XOF input).
 /// * `n`, `k`    — matrix dimensions; output length is exactly `n*k`.
 /// * `out_b`     — caller-owned buffer with at least `out_b_len` bytes.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_expand_raw(
+pub unsafe extern "C" fn capi_bseed_expand_raw(
     bseed_ptr: *const u8,
     n: usize,
     k: usize,
@@ -290,9 +290,9 @@ pub unsafe extern "C" fn pearl_capi_bseed_expand_raw(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_raw"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_raw"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -307,7 +307,7 @@ pub unsafe extern "C" fn pearl_capi_bseed_expand_raw(
 /// * `out_b`       — caller-owned output buffer.
 /// * `out_b_len`   — number of bytes to write.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_expand_range_raw(
+pub unsafe extern "C" fn capi_bseed_expand_range_raw(
     bseed_ptr: *const u8,
     byte_offset: u64,
     out_b: *mut u8,
@@ -332,9 +332,9 @@ pub unsafe extern "C" fn pearl_capi_bseed_expand_range_raw(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_range_raw"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_expand_range_raw"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -348,7 +348,7 @@ pub unsafe extern "C" fn pearl_capi_bseed_expand_range_raw(
 /// * `siblings_ptr` — pointer to `sibling_count` contiguous 32-byte digests.
 /// * `key_ptr`, `expected_root_ptr` — 32-byte buffers.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_verify_proof(
+pub unsafe extern "C" fn capi_merkle_verify_proof(
     leaf_data_ptr: *const u8,
     leaf_indices_ptr: *const u32,
     leaf_count: usize,
@@ -420,21 +420,21 @@ pub unsafe extern "C" fn pearl_capi_merkle_verify_proof(
         }
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_verify_proof"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_verify_proof"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Verify audit_proof v1 sibling paths against an expected root.
 ///
-/// This is intentionally separate from `pearl_capi_merkle_verify_proof`.
+/// This is intentionally separate from `capi_merkle_verify_proof`.
 /// The generic proof verifier consumes the crate's compact multi-leaf proof
 /// format: sorted unique leaves with merged sibling paths. The pool/miner
 /// audit wire format is different by design: K independent leaf-major paths,
 /// duplicates allowed, with `siblings = K * log2(total_leaves)` digests.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_verify_audit_paths(
+pub unsafe extern "C" fn capi_merkle_verify_audit_paths(
     leaf_data_ptr: *const u8,
     leaf_indices_ptr: *const u32,
     leaf_count: usize,
@@ -540,9 +540,9 @@ pub unsafe extern "C" fn pearl_capi_merkle_verify_audit_paths(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_verify_audit_paths"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_verify_audit_paths"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -570,22 +570,22 @@ pub unsafe extern "C" fn pearl_capi_merkle_verify_audit_paths(
 /// * `out_total_leaves` — total number of 1024-byte chunks in the padded
 ///   matrix.
 /// * `out_leaf_data` / `out_leaf_count` — leaf chunks (`leaf_count * 1024`
-///   bytes contiguous). Free with `pearl_capi_free_buffer`, passing
+///   bytes contiguous). Free with `capi_free_buffer`, passing
 ///   `len = leaf_count * 1024`.
 /// * `out_leaf_indices` / `out_leaf_indices_len` — chunk indices, one
 ///   `uint32` per leaf, little-endian native. Free with
-///   `pearl_capi_free_buffer`, passing `len = leaf_indices_len * 4`. (We
+///   `capi_free_buffer`, passing `len = leaf_indices_len * 4`. (We
 ///   reuse the same byte-buffer freer.)
 /// * `out_siblings` / `out_sibling_count` — sibling digests
 ///   (`sibling_count * 32` bytes contiguous). Free with
-///   `pearl_capi_free_buffer`, passing `len = sibling_count * 32`. May be
+///   `capi_free_buffer`, passing `len = sibling_count * 32`. May be
 ///   zero-length (then `*out_siblings` is set to NULL).
 ///
 /// Returns 0 on success, non-zero on error (with `*err_msg_ptr` set;
-/// caller frees with `pearl_capi_free_string`). On error, no output buffer
+/// caller frees with `capi_free_string`). On error, no output buffer
 /// is allocated.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_root_and_proof(
+pub unsafe extern "C" fn capi_merkle_root_and_proof(
     data_ptr: *const u8,
     data_len: usize,
     key_ptr: *const u8,
@@ -691,7 +691,7 @@ pub unsafe extern "C" fn pearl_capi_merkle_root_and_proof(
             idx_buf.shrink_to_fit();
             let len = idx_buf.len();
             let ptr = idx_buf.as_mut_ptr();
-            // Box-from-raw uses [u8] in `pearl_capi_free_buffer`; we layer a
+            // Box-from-raw uses [u8] in `capi_free_buffer`; we layer a
             // u32 slice over the same allocation by forgetting the Vec and
             // exposing its byte length to the caller for freeing.
             std::mem::forget(idx_buf);
@@ -714,17 +714,17 @@ pub unsafe extern "C" fn pearl_capi_merkle_root_and_proof(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_root_and_proof"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_root_and_proof"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Free a u32 buffer previously allocated by
-/// `pearl_capi_merkle_root_and_proof` (the `out_leaf_indices` output).
+/// `capi_merkle_root_and_proof` (the `out_leaf_indices` output).
 /// `len` is the number of u32 elements (not bytes).
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_free_u32_buffer(ptr: *mut u32, len: usize) {
+pub unsafe extern "C" fn capi_free_u32_buffer(ptr: *mut u32, len: usize) {
     if ptr.is_null() || len == 0 {
         return;
     }
@@ -737,16 +737,16 @@ pub unsafe extern "C" fn pearl_capi_free_u32_buffer(ptr: *mut u32, len: usize) {
 // Merkle-tree handle CAPI (build once, prove many)
 // ============================================================================
 //
-// `pearl_capi_merkle_root_and_proof` builds the full Merkle tree on every
+// `capi_merkle_root_and_proof` builds the full Merkle tree on every
 // call. For the miner's B matrix that's 64 MiB of keyed-BLAKE3 per share
 // (~130 ms on a desktop CPU), but the tree is constant per σ — only the
 // inclusion proof for the trigger's column indices changes. Splitting the
 // build/proof phases lets the miner cache the tree at σ install and pay
 // only the proof-extraction cost (~µs) at trigger time.
 //
-// Ownership: `pearl_capi_merkle_build_tree` boxes a `MerkleTreeCtx` and
+// Ownership: `capi_merkle_build_tree` boxes a `MerkleTreeCtx` and
 // returns the raw pointer. The caller MUST eventually call
-// `pearl_capi_merkle_tree_free` on it. Calling `_proof_for_handle` does NOT
+// `capi_merkle_tree_free` on it. Calling `_proof_for_handle` does NOT
 // transfer ownership; the same handle can be proved against many times.
 
 #[allow(non_camel_case_types)]
@@ -934,13 +934,13 @@ fn bseed_merkle_audit_paths(ctx: &BSeedMerkleTreeCtx, leaf_indices: &[usize]) ->
 }
 
 /// Build the keyed-BLAKE3 Merkle tree over `data` once and return an opaque
-/// handle that can be reused across many `pearl_capi_merkle_proof_for_handle`
+/// handle that can be reused across many `capi_merkle_proof_for_handle`
 /// calls. Also writes the 32-byte root and the total leaf count.
 ///
 /// On success: writes `*out_handle`, `*out_root` (32 B), `*out_total_leaves`.
 /// On error: sets `*out_handle = NULL` and writes a message via `err_msg_ptr`.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_build_tree(
+pub unsafe extern "C" fn capi_merkle_build_tree(
     data_ptr: *const u8,
     data_len: usize,
     key_ptr: *const u8,
@@ -983,9 +983,9 @@ pub unsafe extern "C" fn pearl_capi_merkle_build_tree(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_build_tree"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_build_tree"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -995,7 +995,7 @@ pub unsafe extern "C" fn pearl_capi_merkle_build_tree(
 /// native/GPU tensor-hash leaf stage under `key_ptr`. The handle retains only
 /// Merkle CV layers plus BSeed; proof leaf bytes are regenerated on demand.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_merkle_build_tree_from_leaf_cvs(
+pub unsafe extern "C" fn capi_bseed_merkle_build_tree_from_leaf_cvs(
     leaf_cvs_ptr: *const u8,
     leaf_cvs_len: usize,
     bseed_ptr: *const u8,
@@ -1045,9 +1045,9 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_build_tree_from_leaf_cvs(
     }));
 
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_build_tree_from_leaf_cvs"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_build_tree_from_leaf_cvs"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -1057,10 +1057,10 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_build_tree_from_leaf_cvs(
 /// This is the A-side fast path for miners: GPU tensor_hash produces the
 /// keyed BLAKE3 leaf CVs for the full A matrix, while the miner copies back
 /// only the opened A chunks. Rust reconstructs the CV tree, emits the same
-/// proof shape as `pearl_capi_merkle_root_and_proof`, and never needs the full
+/// proof shape as `capi_merkle_root_and_proof`, and never needs the full
 /// matrix bytes.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_proof_from_leaf_cvs(
+pub unsafe extern "C" fn capi_merkle_proof_from_leaf_cvs(
     leaf_cvs_ptr: *const u8,
     leaf_cvs_len: usize,
     leaf_data_ptr: *const u8,
@@ -1211,18 +1211,18 @@ pub unsafe extern "C" fn pearl_capi_merkle_proof_from_leaf_cvs(
     }));
 
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_proof_from_leaf_cvs"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_proof_from_leaf_cvs"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Extract an inclusion proof against a previously built Merkle tree.
-/// Output buffer ownership mirrors `pearl_capi_merkle_root_and_proof`:
-/// `leaf_data` and `siblings` via `pearl_capi_free_buffer`, `leaf_indices`
-/// via `pearl_capi_free_u32_buffer`.
+/// Output buffer ownership mirrors `capi_merkle_root_and_proof`:
+/// `leaf_data` and `siblings` via `capi_free_buffer`, `leaf_indices`
+/// via `capi_free_u32_buffer`.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_proof_for_handle(
+pub unsafe extern "C" fn capi_merkle_proof_for_handle(
     handle: *mut std::ffi::c_void,
     row_indices_ptr: *const u32,
     row_indices_len: usize,
@@ -1314,15 +1314,15 @@ pub unsafe extern "C" fn pearl_capi_merkle_proof_for_handle(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_proof_for_handle"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_proof_for_handle"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Extract an inclusion proof against a BSeed-backed CV-layer handle.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_merkle_proof_for_handle(
+pub unsafe extern "C" fn capi_bseed_merkle_proof_for_handle(
     handle: *mut std::ffi::c_void,
     row_indices_ptr: *const u32,
     row_indices_len: usize,
@@ -1415,9 +1415,9 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_proof_for_handle(
     }));
 
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_proof_for_handle"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_proof_for_handle"); CAPI_ERR_INTERNAL }
     }
 }
 
@@ -1428,12 +1428,12 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_proof_for_handle(
 /// siblings are emitted leaf→root.
 ///
 /// **v1 spec:** `total_leaves` must be a power of two. Non-pow2 trees are
-/// rejected with `PEARL_CAPI_ERR_BAD_ARG`.
+/// rejected with `CAPI_ERR_BAD_ARG`.
 ///
-/// Caller MUST free `*out_siblings` with `pearl_capi_free_buffer` using
+/// Caller MUST free `*out_siblings` with `capi_free_buffer` using
 /// `*out_sibling_bytes` as the length.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_audit_paths_for_handle(
+pub unsafe extern "C" fn capi_merkle_audit_paths_for_handle(
     handle: *mut std::ffi::c_void,
     leaf_indices_ptr: *const u32,
     leaf_indices_len: usize,
@@ -1473,15 +1473,15 @@ pub unsafe extern "C" fn pearl_capi_merkle_audit_paths_for_handle(
         Ok(())
     }));
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_audit_paths_for_handle"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during merkle_audit_paths_for_handle"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Open audit paths against a BSeed-backed CV-layer handle.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_merkle_audit_paths_for_handle(
+pub unsafe extern "C" fn capi_bseed_merkle_audit_paths_for_handle(
     handle: *mut std::ffi::c_void,
     leaf_indices_ptr: *const u32,
     leaf_indices_len: usize,
@@ -1521,16 +1521,16 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_audit_paths_for_handle(
     }));
 
     match result {
-        Ok(Ok(())) => PEARL_CAPI_OK,
-        Ok(Err(e)) => { set_err(err_msg_ptr, e); PEARL_CAPI_ERR_BAD_ARG }
-        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_audit_paths_for_handle"); PEARL_CAPI_ERR_INTERNAL }
+        Ok(Ok(())) => CAPI_OK,
+        Ok(Err(e)) => { set_err(err_msg_ptr, e); CAPI_ERR_BAD_ARG }
+        Err(_)     => { set_err(err_msg_ptr, "panic during bseed_merkle_audit_paths_for_handle"); CAPI_ERR_INTERNAL }
     }
 }
 
 /// Free a BSeed-backed Merkle tree handle previously returned by
-/// `pearl_capi_bseed_merkle_build_tree_from_leaf_cvs`. Safe to call with NULL.
+/// `capi_bseed_merkle_build_tree_from_leaf_cvs`. Safe to call with NULL.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_bseed_merkle_tree_free(handle: *mut std::ffi::c_void) {
+pub unsafe extern "C" fn capi_bseed_merkle_tree_free(handle: *mut std::ffi::c_void) {
     if handle.is_null() {
         return;
     }
@@ -1538,9 +1538,9 @@ pub unsafe extern "C" fn pearl_capi_bseed_merkle_tree_free(handle: *mut std::ffi
 }
 
 /// Free a Merkle tree handle previously returned by
-/// `pearl_capi_merkle_build_tree`. Safe to call with `NULL`.
+/// `capi_merkle_build_tree`. Safe to call with `NULL`.
 #[no_mangle]
-pub unsafe extern "C" fn pearl_capi_merkle_tree_free(handle: *mut std::ffi::c_void) {
+pub unsafe extern "C" fn capi_merkle_tree_free(handle: *mut std::ffi::c_void) {
     if handle.is_null() {
         return;
     }

@@ -132,7 +132,7 @@ public sealed record MiningConfiguration(
     }
 
     /// <summary>
-    /// Parse a comma-separated index list from an env var (e.g. AKOYA_ROWS_PATTERN
+    /// Parse a comma-separated index list from an env var (e.g. NW_ROWS_PATTERN
     /// = "0,1,2,...,15"); returns <paramref name="fallback"/> if unset/blank.
     /// The committed hash-tile pattern MUST match what the GPU kernel actually
     /// XORs per tile, or shares are rejected. The ROCm (MI300X) kernel computes a
@@ -151,8 +151,8 @@ public sealed record MiningConfiguration(
     /// <summary>
     /// Default MiningConfiguration matching pearl-pure-miner: common_dim=k,
     /// rank=128, MMAType.Int7xInt7ToInt32. Rows/cols patterns default to the H100
-    /// hash-tile pattern but can be overridden via AKOYA_ROWS_PATTERN /
-    /// AKOYA_COLS_PATTERN (the ROCm path sets both to the contiguous 16x16 the
+    /// hash-tile pattern but can be overridden via NW_ROWS_PATTERN /
+    /// NW_COLS_PATTERN (the ROCm path sets both to the contiguous 16x16 the
     /// MI300X kernel computes). The pattern is committed in job_key and verified
     /// per-share, so any valid periodic AP is accepted by the network.
     /// </summary>
@@ -161,8 +161,8 @@ public sealed record MiningConfiguration(
             CommonDim: commonDim,
             Rank: rank,
             MmaType: MMAType.Int7xInt7ToInt32,
-            RowsPattern: PeriodicPattern.FromIndices(PatternFromEnv("AKOYA_ROWS_PATTERN", DefaultRowsIndices)),
-            ColsPattern: PeriodicPattern.FromIndices(PatternFromEnv("AKOYA_COLS_PATTERN", DefaultColsIndices)));
+            RowsPattern: PeriodicPattern.FromIndices(PatternFromEnv("NW_ROWS_PATTERN", DefaultRowsIndices)),
+            ColsPattern: PeriodicPattern.FromIndices(PatternFromEnv("NW_COLS_PATTERN", DefaultColsIndices)));
 
     /// <summary>
     /// Protocol dot-product length used by the per-tile target scaling.

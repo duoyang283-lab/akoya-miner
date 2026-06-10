@@ -15,7 +15,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Pool;
 
@@ -120,15 +120,15 @@ public sealed class PoolConnection : IAsyncDisposable
         if (useTls && tlsInsecure)
         {
             // Escape hatch for testnet / self-signed / private-CA scenarios.
-            // V1 had no equivalent; V2 adds AKOYA_POOL_TLS_INSECURE=1.
+            // V1 had no equivalent; V2 adds NW_POOL_TLS_INSECURE=1.
             // NEVER set this in production — it disables peer cert validation
             // entirely and exposes the SessionToken to MitM.
             log.LogWarning(
-                "pool: AKOYA_POOL_TLS_INSECURE=1 — TLS cert validation DISABLED. " +
+                "pool: NW_POOL_TLS_INSECURE=1 — TLS cert validation DISABLED. " +
                 "Do not use in production.");
             handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions
             {
-#pragma warning disable CA5359 // intentional opt-in via AKOYA_POOL_TLS_INSECURE=1; gated above
+#pragma warning disable CA5359 // intentional opt-in via NW_POOL_TLS_INSECURE=1; gated above
                 RemoteCertificateValidationCallback = (_, _, _, _) => true,
 #pragma warning restore CA5359
             };

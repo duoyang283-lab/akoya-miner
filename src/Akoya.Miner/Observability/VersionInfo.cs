@@ -10,7 +10,7 @@ namespace Akoya.Miner.Observability;
 internal static class VersionInfo
 {
     /// <summary>Bumped whenever the C# miner relies on a new capi entry point or
-    /// changes the on-wire format. Compared against pearl_capi_*_version.</summary>
+    /// changes the on-wire format. Compared against capi_*_version.</summary>
     public const int RequiredGemmAbi   = 2;
     public const int RequiredMiningAbi = 2;
 
@@ -28,13 +28,13 @@ internal static class VersionInfo
 
     public static int Run(string[] args)
     {
-        Console.WriteLine($"akoya-miner");
+        Console.WriteLine($"node-worker");
         Console.WriteLine($"  version      : {MinerVersion}");
         Console.WriteLine($"  git_sha      : {GitSha}");
         Console.WriteLine($"  runtime      : {Environment.Version} ({System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription})");
         try
         {
-            int gemmAbi = PearlGemmNative.AbiVersion();
+            int gemmAbi = GemmNative.AbiVersion();
             Console.WriteLine($"  pearl_gemm   : abi v{gemmAbi}{(gemmAbi == RequiredGemmAbi ? "" : $" (mismatch — required v{RequiredGemmAbi})")}");
         }
         catch (Exception e)
@@ -43,7 +43,7 @@ internal static class VersionInfo
         }
         try
         {
-            uint miningAbi = PearlMiningNative.Version();
+            uint miningAbi = MiningNative.Version();
             Console.WriteLine($"  pearl_mining : abi v{miningAbi}{(miningAbi == RequiredMiningAbi ? "" : $" (mismatch — required v{RequiredMiningAbi})")}");
         }
         catch (Exception e)
@@ -59,9 +59,9 @@ internal static class VersionInfo
     {
         int gemmAbi;
         uint miningAbi;
-        try { gemmAbi = PearlGemmNative.AbiVersion(); }
+        try { gemmAbi = GemmNative.AbiVersion(); }
         catch (Exception e) { throw new InvalidOperationException($"failed to load libpearl_gemm_capi.so: {e.Message}", e); }
-        try { miningAbi = PearlMiningNative.Version(); }
+        try { miningAbi = MiningNative.Version(); }
         catch (Exception e) { throw new InvalidOperationException($"failed to load libpearl_mining_capi.so: {e.Message}", e); }
 
         log.LogInformation("version git_sha={Sha} pearl_gemm_abi=v{Gemm} pearl_mining_abi=v{Mining}",

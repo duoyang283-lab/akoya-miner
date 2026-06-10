@@ -3,8 +3,8 @@ using System.Diagnostics;
 using Akoya.Crypto;
 using Akoya.Mining;
 using Google.Protobuf;
-using PearlPool.Proto.V2;
-using ProtoMerkleProof = PearlPool.Proto.V2.MerkleProof;
+using Pool.Proto.V2;
+using ProtoMerkleProof = Pool.Proto.V2.MerkleProof;
 
 namespace Akoya.Miner.Mining;
 

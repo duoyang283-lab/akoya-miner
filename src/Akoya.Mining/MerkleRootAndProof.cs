@@ -1,4 +1,4 @@
-// MerkleRootAndProof — managed wrapper over pearl_capi_merkle_root_and_proof.
+// MerkleRootAndProof — managed wrapper over capi_merkle_root_and_proof.
 //
 // Fuses what used to be three independent scans over the same 32-128 MB matrix
 // (one keyed-BLAKE3 Merkle root + one Merkle tree build for the A proof + one
@@ -14,7 +14,7 @@ public sealed class MerkleRootAndProofException : Exception
 {
     public int Code { get; }
     public MerkleRootAndProofException(int code, string msg)
-        : base($"pearl_capi_merkle_root_and_proof failed (code={code}): {msg}")
+        : base($"capi_merkle_root_and_proof failed (code={code}): {msg}")
         => Code = code;
 }
 
@@ -62,7 +62,7 @@ public static class MerkleRootAndProof
             fixed (uint* pRows = rowIndices)
             fixed (byte* pRoot = root)
             {
-                rc = PearlMiningNative.MerkleRootAndProof(
+                rc = MiningNative.MerkleRootAndProof(
                     pData, (nuint)data.Length,
                     pKey,
                     pRows, (nuint)rowIndices.Length,
@@ -110,10 +110,10 @@ public static class MerkleRootAndProof
         }
         finally
         {
-            if (leafDataPtr != null) PearlMiningNative.FreeBuffer(leafDataPtr, leafCount * 1024);
-            if (leafIdxPtr  != null) PearlMiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
-            if (siblingsPtr != null) PearlMiningNative.FreeBuffer(siblingsPtr, sibCount * 32);
-            if (errMsg      != null) PearlMiningNative.FreeString(errMsg);
+            if (leafDataPtr != null) MiningNative.FreeBuffer(leafDataPtr, leafCount * 1024);
+            if (leafIdxPtr  != null) MiningNative.FreeU32Buffer(leafIdxPtr, leafIdxLen);
+            if (siblingsPtr != null) MiningNative.FreeBuffer(siblingsPtr, sibCount * 32);
+            if (errMsg      != null) MiningNative.FreeString(errMsg);
         }
     }
 }

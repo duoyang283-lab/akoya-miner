@@ -48,7 +48,7 @@ internal sealed class ResidentBStateBuffers : IDisposable
         long bEBL_K      = (long)R * K;
         long bEBR        = (long)N * R;
         long bEARxBpEB16 = (long)N * R * 2;
-        long rootsBytes  = PearlGemmNative.GetRequiredScratchpadBytes(bB, (int)TensorHashThreads);
+        long rootsBytes  = GemmNative.GetRequiredScratchpadBytes(bB, (int)TensorHashThreads);
         LeafCvBytes = ((bB + Blake3.ChunkLen - 1) / Blake3.ChunkLen) * Blake3.DigestSize;
 
         B         = Alloc(bB);
@@ -68,7 +68,7 @@ internal sealed class ResidentBStateBuffers : IDisposable
         unsafe
         {
             nint ws = IntPtr.Zero;
-            Check("resident_b_workspace_alloc", PearlGemmNative.WorkspaceAlloc(
+            Check("resident_b_workspace_alloc", GemmNative.WorkspaceAlloc(
                 m: 0,
                 n: N,
                 k: K,
@@ -88,7 +88,7 @@ internal sealed class ResidentBStateBuffers : IDisposable
 
         if (NoiseWorkspace != IntPtr.Zero)
         {
-            try { _ = PearlGemmNative.WorkspaceFree(NoiseWorkspace, _stream.Handle); } catch { /* shutdown */ }
+            try { _ = GemmNative.WorkspaceFree(NoiseWorkspace, _stream.Handle); } catch { /* shutdown */ }
             NoiseWorkspace = IntPtr.Zero;
         }
 

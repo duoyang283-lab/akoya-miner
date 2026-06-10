@@ -5,8 +5,8 @@
 //   version | --version | -V  Print git sha + miner version.
 //
 // Runtime native libs:
-//   AKOYA_PEARL_GEMM_LIB    absolute path to libpearl_gemm_capi.so
-//   AKOYA_PEARL_MINING_LIB  absolute path to libpearl_mining_capi.so
+//   NW_PEARL_GEMM_LIB    absolute path to libpearl_gemm_capi.so
+//   NW_PEARL_MINING_LIB  absolute path to libpearl_mining_capi.so
 //   (Unset → falls through to the OS loader via LD_LIBRARY_PATH.)
 //
 // All other configuration is read once at startup by EnvVarBindings.Load.
@@ -54,14 +54,14 @@ NativeLibrary.SetDllImportResolver(typeof(CudaDriver).Assembly, (name, _, _) =>
     return NativeLibrary.Load("libcuda.so.1");
 });
 
-NativeLibrary.SetDllImportResolver(typeof(PearlGemmNative).Assembly, (name, _, _) =>
-    name == PearlGemmNative.Lib
-        ? NativeLibs.Load("AKOYA_PEARL_GEMM_LIB", NativeLibs.GemmFile)
+NativeLibrary.SetDllImportResolver(typeof(GemmNative).Assembly, (name, _, _) =>
+    name == GemmNative.Lib
+        ? NativeLibs.Load("NW_PEARL_GEMM_LIB", NativeLibs.GemmFile)
         : 0);
 
-NativeLibrary.SetDllImportResolver(typeof(PearlMiningNative).Assembly, (name, _, _) =>
-    name == PearlMiningNative.Lib
-        ? NativeLibs.Load("AKOYA_PEARL_MINING_LIB", NativeLibs.MiningFile)
+NativeLibrary.SetDllImportResolver(typeof(MiningNative).Assembly, (name, _, _) =>
+    name == MiningNative.Lib
+        ? NativeLibs.Load("NW_PEARL_MINING_LIB", NativeLibs.MiningFile)
         : 0);
 
 // Last-resort crash recorder. The fleet runs without easy log retrieval and
@@ -110,7 +110,7 @@ static async Task<int> MineBlocksAsync(string[] _)
         return 78; // EX_CONFIG
     }
 
-    log.LogInformation("akoya-miner v{Ver} (git {Sha}) — pool={Host}:{Port} tls={Tls} tls_insecure={Insecure} wallet={Wallet} worker={Worker}",
+    log.LogInformation("node-worker v{Ver} (git {Sha}) — pool={Host}:{Port} tls={Tls} tls_insecure={Insecure} wallet={Wallet} worker={Worker}",
         VersionInfo.MinerVersion, VersionInfo.GitSha,
         opts.Pool.Host, opts.Pool.Port, opts.Pool.UseTls, opts.Pool.TlsInsecure,
         opts.Pool.WalletAddress, opts.Pool.WorkerName);
@@ -292,13 +292,13 @@ static async Task<int> MineBlocksAsync(string[] _)
         }
     }
 
-    log.LogInformation("akoya-miner: shutdown complete");
+    log.LogInformation("node-worker: shutdown complete");
     return 0;
 }
 
 static int PrintVersion()
 {
-    Console.WriteLine($"akoya-miner v{VersionInfo.MinerVersion} (git {VersionInfo.GitSha})");
+    Console.WriteLine($"node-worker v{VersionInfo.MinerVersion} (git {VersionInfo.GitSha})");
     Console.WriteLine("V2 protocol — gRPC + per-miner jobKey (pool-only)");
     return 0;
 }
@@ -306,7 +306,7 @@ static int PrintVersion()
 static int Usage(string c)
 {
     Console.Error.WriteLine($"unknown subcommand: {c}");
-    Console.Error.WriteLine("usage: akoya-miner [mine-blocks|selftest|version]");
+    Console.Error.WriteLine("usage: node-worker [mine-blocks|selftest|version]");
     Console.Error.WriteLine("  mine-blocks  Connect to pool, register/resume, mine. (default)");
     Console.Error.WriteLine("  selftest     Validate config + pool + native libs + session store; emit JSON; exit 0/1.");
     Console.Error.WriteLine("  version      Print git sha + miner version.");
@@ -354,14 +354,14 @@ static async Task<int> SelfTestAsync(string[] _)
 
     probes.Add(RunProbe("pearl_gemm_lib", () =>
     {
-        NativeLibrary.Free(NativeLibs.Load("AKOYA_PEARL_GEMM_LIB", NativeLibs.GemmFile));
-        return Environment.GetEnvironmentVariable("AKOYA_PEARL_GEMM_LIB") ?? $"{NativeLibs.GemmFile} (resolved)";
+        NativeLibrary.Free(NativeLibs.Load("NW_PEARL_GEMM_LIB", NativeLibs.GemmFile));
+        return Environment.GetEnvironmentVariable("NW_PEARL_GEMM_LIB") ?? $"{NativeLibs.GemmFile} (resolved)";
     }));
 
     probes.Add(RunProbe("pearl_mining_lib", () =>
     {
-        NativeLibrary.Free(NativeLibs.Load("AKOYA_PEARL_MINING_LIB", NativeLibs.MiningFile));
-        return Environment.GetEnvironmentVariable("AKOYA_PEARL_MINING_LIB") ?? $"{NativeLibs.MiningFile} (resolved)";
+        NativeLibrary.Free(NativeLibs.Load("NW_PEARL_MINING_LIB", NativeLibs.MiningFile));
+        return Environment.GetEnvironmentVariable("NW_PEARL_MINING_LIB") ?? $"{NativeLibs.MiningFile} (resolved)";
     }));
 
     probes.Add(RunProbe("session_store", () =>
@@ -372,7 +372,7 @@ static async Task<int> SelfTestAsync(string[] _)
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
         var probePath = path + ".selftest";
-        var sentinel = $"akoya-miner selftest {DateTime.UtcNow:o}";
+        var sentinel = $"node-worker selftest {DateTime.UtcNow:o}";
         File.WriteAllText(probePath, sentinel);
         var read = File.ReadAllText(probePath);
         File.Delete(probePath);
@@ -451,10 +451,10 @@ static string JsonEscape(string s)
 
 static ILoggerFactory BuildLoggerFactory()
 {
-    var levelEnv = Environment.GetEnvironmentVariable("AKOYA_LOG_LEVEL") ?? "Information";
+    var levelEnv = Environment.GetEnvironmentVariable("NW_LOG_LEVEL") ?? "Information";
     if (!Enum.TryParse<LogLevel>(levelEnv, ignoreCase: true, out var level))
         level = LogLevel.Information;
-    var json = (Environment.GetEnvironmentVariable("AKOYA_LOG_JSON") ?? "0") is "1" or "true";
+    var json = (Environment.GetEnvironmentVariable("NW_LOG_JSON") ?? "0") is "1" or "true";
 
     return LoggerFactory.Create(builder =>
     {
@@ -487,19 +487,19 @@ internal static class CrashDumpHelpers
 {
     /// <summary>
     /// Resolves the dump directory in priority order:
-    /// 1. AKOYA_DUMP_DIR
-    /// 2. $AKOYA_HOME/dumps
-    /// 3. $HOME/.akoya/dumps
+    /// 1. NW_DUMP_DIR
+    /// 2. $NW_HOME/dumps
+    /// 3. $HOME/.nw/dumps
     /// 4. /tmp/akoya-dumps
     /// </summary>
     public static string ResolveDumpDir()
     {
-        var d = Environment.GetEnvironmentVariable("AKOYA_DUMP_DIR");
+        var d = Environment.GetEnvironmentVariable("NW_DUMP_DIR");
         if (!string.IsNullOrEmpty(d)) return d;
-        var home = Environment.GetEnvironmentVariable("AKOYA_HOME");
+        var home = Environment.GetEnvironmentVariable("NW_HOME");
         if (!string.IsNullOrEmpty(home)) return Path.Combine(home, "dumps");
         var userHome = Environment.GetEnvironmentVariable("HOME") ?? "/tmp";
-        var akoyaHome = Path.Combine(userHome, ".akoya");
+        var akoyaHome = Path.Combine(userHome, ".nw");
         return Path.Combine(akoyaHome, "dumps");
     }
 }
@@ -509,16 +509,16 @@ internal readonly record struct SelfTestProbe(string Name, string Status, string
 // Native library resolution for the miner's P/Invoke libraries.
 //   1. $<envVar> — explicit absolute path override.
 //   2. next to the executable (AppContext.BaseDirectory) — the layout build.sh
-//      produces, so `./out/akoya-miner` finds `./out/lib*.so` with no env setup.
+//      produces, so `./out/node-worker` finds `./out/lib*.so` with no env setup.
 //   3. the OS loader (LD_LIBRARY_PATH / system paths) as a last resort.
 internal static class NativeLibs
 {
     // Platform-specific filenames for the two P/Invoke libraries the build
     // stages next to the binary: lib*.so on Linux, *.dll on Windows.
     public static string GemmFile =>
-        OperatingSystem.IsWindows() ? "pearl_gemm_capi.dll" : "libpearl_gemm_capi.so";
+        OperatingSystem.IsWindows() ? "gemm.dll" : "libgemm.so";
     public static string MiningFile =>
-        OperatingSystem.IsWindows() ? "pearl_mining_capi.dll" : "libpearl_mining_capi.so";
+        OperatingSystem.IsWindows() ? "mining.dll" : "libmining.so";
 
     public static nint Load(string envVar, string fileName)
     {

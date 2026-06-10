@@ -120,7 +120,7 @@ public static partial class CudaDriver
 
     // Pinned host memory. Returned pointer is a host pointer (nint),
     // not a device pointer — pass it as host_signal_header_pinned to
-    // pearl_capi_noisy_gemm.
+    // capi_noisy_gemm.
     [LibraryImport(Lib, EntryPoint = "cuMemHostAlloc")]
     public static partial CUresult MemHostAlloc(out nint pp, nuint bytesize, uint flags);
 

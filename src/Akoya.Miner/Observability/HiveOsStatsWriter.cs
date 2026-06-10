@@ -1,6 +1,6 @@
 // HiveOsStatsWriter — periodic JSON stats file for HiveOS integration.
 //
-// Writes /run/hive/akoya-miner-stats.json (or a configurable path) every N
+// Writes /run/hive/node-worker-stats.json (or a configurable path) every N
 // seconds. HiveOS's h-stats.sh reads this file and reformats it for the
 // dashboard. Atomic write via temp+rename.
 

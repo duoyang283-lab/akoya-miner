@@ -98,9 +98,9 @@ internal sealed class WorkerBuffers : IDisposable
         long aLeafCvsBytes = ((bA + Blake3.ChunkLen - 1) / Blake3.ChunkLen) * Blake3.DigestSize;
         long aSelectedBytes = (long)MiningConfiguration.DefaultRowsIndices.Length * K;
 
-        SyncSize   = PearlGemmNative.GetHostSignalSyncSize();
-        HeaderSize = PearlGemmNative.GetHostSignalHeaderSize();
-        long rootsBytes = PearlGemmNative.GetRequiredScratchpadBytes(
+        SyncSize   = GemmNative.GetHostSignalSyncSize();
+        HeaderSize = GemmNative.GetHostSignalHeaderSize();
+        long rootsBytes = GemmNative.GetRequiredScratchpadBytes(
             Math.Max(bA, bB), (int)TENSOR_HASH_THREADS);
         HostALeafCvsSize = aLeafCvsBytes;
         HostASelectedSize = aSelectedBytes;

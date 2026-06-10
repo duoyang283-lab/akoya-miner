@@ -1,6 +1,6 @@
 // Turing SM75 int8 helper GEMMs for portable noise_A / noise_B paths.
 //
-// This keeps the portable_int8_helpers API used by pearl_gemm_capi.cpp, but
+// This keeps the portable_int8_helpers API used by gemm_capi.cpp, but
 // replaces the Volta/Turing DP4A fallback with exact Turing int8 tensor cores.
 // Turing has no cp.async, so global-to-shared copies use ordinary vectorized
 // UniversalCopy plus CTA barriers.

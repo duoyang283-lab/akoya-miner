@@ -11,7 +11,7 @@ using Akoya.Miner.Observability;
 using Akoya.MinerCore;
 using Akoya.Mining;
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Miner.Mining;
 
@@ -478,7 +478,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 //     CPU overlap: GPU runs Ping while CPU sets up Pong's headers
                 //     and enqueues kernels on the independent Pong stream.
                 //
-                //     Emergency switch: if AKOYA_DISABLE_PONG=1, force pongSize=0
+                //     Emergency switch: if NW_DISABLE_PONG=1, force pongSize=0
                 //     to fall back to V1-equivalent single-stream behaviour. Use
                 //     this if bursty `claimedHash > liveTarget` pre-submit skips
                 //     appear clustered in a single σ window (a symptom that
@@ -648,7 +648,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         var headers = EnsureHeaderPtrBatch(half, batch);
         if (half.GraphReady && batch == b.MatmulsPerPoll)
         {
-            int rc = PearlGemm.PearlGemmNative.IterBatchGraphLaunch(
+            int rc = PearlGemm.GemmNative.IterBatchGraphLaunch(
                 half.Workspace, batchStart, half.Stream.Handle);
             if (rc == 0) return;
 
@@ -671,7 +671,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         unsafe
         {
             fixed (nint* pHeaders = headers)
-                Check("iter_batch", PearlGemm.PearlGemmNative.IterBatch(
+                Check("iter_batch", PearlGemm.GemmNative.IterBatch(
                     half.Workspace, batchStart, pHeaders, batch, half.Stream.Handle));
         }
     }
@@ -696,7 +696,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         if (half.GraphReady && batch == b.MatmulsPerPoll)
         {
             stageStart = Stopwatch.GetTimestamp();
-            int rc = PearlGemm.PearlGemmNative.IterBatchGraphLaunch(
+            int rc = PearlGemm.GemmNative.IterBatchGraphLaunch(
                 half.Workspace, batchStart, half.Stream.Handle);
             double graphLaunchMs = ElapsedMsSince(stageStart);
             if (rc == 0)
@@ -733,7 +733,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         unsafe
         {
             fixed (nint* pHeaders = headers)
-                Check("iter_batch", PearlGemm.PearlGemmNative.IterBatch(
+                Check("iter_batch", PearlGemm.GemmNative.IterBatch(
                     half.Workspace, batchStart, pHeaders, batch, half.Stream.Handle));
         }
         double iterEnqueueMs = ElapsedMsSince(stageStart);
@@ -775,7 +775,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         unsafe
         {
             fixed (nint* pHeaders = headers)
-                rc = PearlGemm.PearlGemmNative.IterBatchGraphPrepare(
+                rc = PearlGemm.GemmNative.IterBatchGraphPrepare(
                     half.Workspace, pHeaders, count, half.Stream.Handle);
         }
 
@@ -997,7 +997,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
 
         if (half.Workspace != IntPtr.Zero)
         {
-            try { _ = PearlGemm.PearlGemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle); }
+            try { _ = PearlGemm.GemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle); }
             catch { /* best-effort */ }
             half.Workspace = IntPtr.Zero;
             half.GraphReady = false;
@@ -1015,9 +1015,9 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         long bA = (long)a.M * a.K;
 
         H2D(bs.Key, ctx.JobKey);
-        Check("lcg_int7 A throwaway", PearlGemm.PearlGemmNative.LcgInt7Fill(
+        Check("lcg_int7 A throwaway", PearlGemm.GemmNative.LcgInt7Fill(
             a.A.Handle, bA, THROWAWAY_A_SEED_LO, s.SigmaSeed, scratchHalf.Stream.Handle));
-        Check("tensor_hash A seed", PearlGemm.PearlGemmNative.TensorHash(
+        Check("tensor_hash A seed", PearlGemm.GemmNative.TensorHash(
             a.A.Handle, (uint)bA, a.AHash.Handle, bs.Key.Handle,
             NumBlocks(bA), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
             TENSOR_HASH_LEAVES, a.Roots.Handle, scratchHalf.DeviceId, scratchHalf.Stream.Handle));
@@ -1050,7 +1050,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
             unsafe
             {
                 nint ws = IntPtr.Zero;
-                Check("workspace_alloc", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                Check("workspace_alloc", PearlGemm.GemmNative.WorkspaceAlloc(
                     b.M, b.N, b.K, b.R,
                     withNoiseA: 1, withNoiseB: 0,
                     outWorkspace: &ws, half.Stream.Handle));
@@ -1060,7 +1060,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
 
         unsafe
         {
-            var wp = new PearlGemm.PearlGemmNative.WorkspaceParams
+            var wp = new PearlGemm.GemmNative.WorkspaceParams
             {
                 M = b.M, N = b.N, K = b.K, R = b.R,
                 BM = BM, BN = BN, BK = BK, CM = CM, CN = CN,
@@ -1071,7 +1071,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 SigmaSeed   = s.SigmaSeed,
 
                 // ── A-side: always this half's own buffers ───────────────────
-                // These are written per-iter by pearl_capi_iter and must not be
+                // These are written per-iter by capi_iter and must not be
                 // shared between concurrent streams.
                 A           = b.A.Handle,
                 AHash       = b.AHash.Handle,
@@ -1105,7 +1105,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 B_scales    = bs.BScales.Handle,
             };
             Check("workspace_install_params",
-                PearlGemm.PearlGemmNative.WorkspaceInstallParams(half.Workspace, &wp));
+                PearlGemm.GemmNative.WorkspaceInstallParams(half.Workspace, &wp));
         }
     }
 
@@ -1254,7 +1254,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         stageStart = RuntimeTimingStart();
         if (b.MatmulsPerPoll > 1 || winSeed != s.GlobalIterIdx - 1)
         {
-            Check("lcg_int7 A regen", PearlGemm.PearlGemmNative.LcgInt7Fill(
+            Check("lcg_int7 A regen", PearlGemm.GemmNative.LcgInt7Fill(
                 b.A.Handle, bA, winSeed, s.SigmaSeed, half.Stream.Handle));
             CudaDriver.Check(CudaDriver.StreamSynchronize(half.Stream), "sync A regen");
         }
@@ -1276,7 +1276,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         stageStart = RuntimeTimingStart();
         if (CanUseFastAProofPath(b, aRowsU32, bA))
         {
-            Check("tensor_hash A leaf_cvs", PearlGemm.PearlGemmNative.TensorHashLeafCvs(
+            Check("tensor_hash A leaf_cvs", PearlGemm.GemmNative.TensorHashLeafCvs(
                 b.A.Handle, (uint)bA, b.AHash.Handle, s.BState.Key.Handle,
                 NumBlocks(bA), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
                 TENSOR_HASH_LEAVES, b.Roots.Handle, b.ALeafCvs.Handle, half.DeviceId, half.Stream.Handle));
@@ -1500,7 +1500,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         {
             fixed (byte* pSeed = seedBuffer)
             {
-                var p = new PearlGemm.PearlGemmNative.InstallBParams
+                var p = new PearlGemm.GemmNative.InstallBParams
                 {
                     M = a.M,
                     N = bState.N,
@@ -1531,7 +1531,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                     Workspace = bState.NoiseWorkspace,
                     LeafCvs = bState.LeafCvs.Handle,
                 };
-                Check("install_B", PearlGemm.PearlGemmNative.InstallB(&p, stream.Handle));
+                Check("install_B", PearlGemm.GemmNative.InstallB(&p, stream.Handle));
             }
         }
     }
@@ -1796,9 +1796,9 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
 
                     double aSeedHashMs = MeasureStreamStageMs(ping.Stream, () =>
                     {
-                        Check("lcg_int7 A throwaway", PearlGemm.PearlGemmNative.LcgInt7Fill(
+                        Check("lcg_int7 A throwaway", PearlGemm.GemmNative.LcgInt7Fill(
                             ping.Buffers.A.Handle, bA, THROWAWAY_A_SEED_LO, sigmaSeed, ping.Stream.Handle));
-                        Check("tensor_hash A seed", PearlGemm.PearlGemmNative.TensorHash(
+                        Check("tensor_hash A seed", PearlGemm.GemmNative.TensorHash(
                             ping.Buffers.A.Handle, (uint)bA, ping.Buffers.AHash.Handle, bState.Key.Handle,
                             NumBlocks(bA), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
                             TENSOR_HASH_LEAVES, ping.Buffers.Roots.Handle, ping.DeviceId, ping.Stream.Handle));
@@ -1825,7 +1825,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                             if (ping.Workspace == IntPtr.Zero)
                             {
                                 nint ws = IntPtr.Zero;
-                                Check("workspace_alloc ping", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                                Check("workspace_alloc ping", PearlGemm.GemmNative.WorkspaceAlloc(
                                     ping.Buffers.M, ping.Buffers.N, ping.Buffers.K, ping.Buffers.R,
                                     withNoiseA: 1, withNoiseB: 0,
                                     outWorkspace: &ws, ping.Stream.Handle));
@@ -1835,7 +1835,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                             if (pong.Workspace == IntPtr.Zero)
                             {
                                 nint ws = IntPtr.Zero;
-                                Check("workspace_alloc pong", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                                Check("workspace_alloc pong", PearlGemm.GemmNative.WorkspaceAlloc(
                                     pong.Buffers.M, pong.Buffers.N, pong.Buffers.K, pong.Buffers.R,
                                     withNoiseA: 1, withNoiseB: 0,
                                     outWorkspace: &ws, pong.Stream.Handle));
@@ -2291,7 +2291,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
     {
         if (half.Workspace == IntPtr.Zero) return;
         Check("workspace_free (sigma bench rotate)",
-            PearlGemm.PearlGemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle));
+            PearlGemm.GemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle));
         half.Workspace = IntPtr.Zero;
         half.GraphReady = false;
     }
@@ -2305,7 +2305,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         var bs = bSideSource ?? b;
         unsafe
         {
-            var wp = new PearlGemm.PearlGemmNative.WorkspaceParams
+            var wp = new PearlGemm.GemmNative.WorkspaceParams
             {
                 M = b.M, N = b.N, K = b.K, R = b.R,
                 BM = BM, BN = BN, BK = BK, CM = CM, CN = CN,
@@ -2344,7 +2344,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 B_scales = bs.BScales.Handle,
             };
             Check("workspace_install_params",
-                PearlGemm.PearlGemmNative.WorkspaceInstallParams(half.Workspace, &wp));
+                PearlGemm.GemmNative.WorkspaceInstallParams(half.Workspace, &wp));
         }
     }
 
@@ -2356,7 +2356,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         var b = half.Buffers;
         unsafe
         {
-            var wp = new PearlGemm.PearlGemmNative.WorkspaceParams
+            var wp = new PearlGemm.GemmNative.WorkspaceParams
             {
                 M = b.M, N = b.N, K = b.K, R = b.R,
                 BM = BM, BN = BN, BK = BK, CM = CM, CN = CN,
@@ -2395,7 +2395,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 B_scales = bState.BScales.Handle,
             };
             Check("workspace_install_params",
-                PearlGemm.PearlGemmNative.WorkspaceInstallParams(half.Workspace, &wp));
+                PearlGemm.GemmNative.WorkspaceInstallParams(half.Workspace, &wp));
         }
     }
 
@@ -2410,9 +2410,9 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         long bA = (long)a.M * a.K;
 
         H2D(bState.Key, jobKey);
-        Check("lcg_int7 A throwaway", PearlGemm.PearlGemmNative.LcgInt7Fill(
+        Check("lcg_int7 A throwaway", PearlGemm.GemmNative.LcgInt7Fill(
             a.A.Handle, bA, THROWAWAY_A_SEED_LO, sigmaSeed, scratchHalf.Stream.Handle));
-        Check("tensor_hash A seed", PearlGemm.PearlGemmNative.TensorHash(
+        Check("tensor_hash A seed", PearlGemm.GemmNative.TensorHash(
             a.A.Handle, (uint)bA, a.AHash.Handle, bState.Key.Handle,
             NumBlocks(bA), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
             TENSOR_HASH_LEAVES, a.Roots.Handle, scratchHalf.DeviceId, scratchHalf.Stream.Handle));
@@ -2441,7 +2441,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
             unsafe
             {
                 nint ws = IntPtr.Zero;
-                Check("workspace_alloc", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                Check("workspace_alloc", PearlGemm.GemmNative.WorkspaceAlloc(
                     b.M, b.N, b.K, b.R,
                     withNoiseA: 1, withNoiseB: 0,
                     outWorkspace: &ws, half.Stream.Handle));
@@ -2463,7 +2463,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         if (half.Workspace != IntPtr.Zero)
         {
             Check("workspace_free (bench rotate)",
-                PearlGemm.PearlGemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle));
+                PearlGemm.GemmNative.WorkspaceFree(half.Workspace, half.Stream.Handle));
             half.Workspace = IntPtr.Zero;
             half.GraphReady = false;
         }
@@ -2479,21 +2479,21 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 half.BUploaded = true;
             }
 
-            Check("tensor_hash B", PearlGemm.PearlGemmNative.TensorHash(
+            Check("tensor_hash B", PearlGemm.GemmNative.TensorHash(
                 b.B.Handle, (uint)bB, b.BHash.Handle, b.Key.Handle,
                 NumBlocks(bB), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
                 TENSOR_HASH_LEAVES, b.Roots.Handle, half.DeviceId, half.Stream.Handle));
 
-            Check("lcg_int7 A throwaway", PearlGemm.PearlGemmNative.LcgInt7Fill(
+            Check("lcg_int7 A throwaway", PearlGemm.GemmNative.LcgInt7Fill(
                 b.A.Handle, bA, THROWAWAY_A_SEED_LO, sigmaSeed, half.Stream.Handle));
-            Check("tensor_hash A seed", PearlGemm.PearlGemmNative.TensorHash(
+            Check("tensor_hash A seed", PearlGemm.GemmNative.TensorHash(
                 b.A.Handle, (uint)bA, b.AHash.Handle, b.Key.Handle,
                 NumBlocks(bA), TENSOR_HASH_THREADS, TENSOR_HASH_STAGES,
                 TENSOR_HASH_LEAVES, b.Roots.Handle, half.DeviceId, half.Stream.Handle));
-            Check("commit_seed", PearlGemm.PearlGemmNative.CommitmentHashFromMerkleRoots(
+            Check("commit_seed", PearlGemm.GemmNative.CommitmentHashFromMerkleRoots(
                 b.AHash.Handle, b.BHash.Handle, b.Key.Handle,
                 b.CommitA.Handle, b.CommitB.Handle, half.DeviceId, half.Stream.Handle));
-            Check("noise_gen full", PearlGemm.PearlGemmNative.NoiseGen(
+            Check("noise_gen full", PearlGemm.GemmNative.NoiseGen(
                 b.R, b.M, b.N, b.K,
                 b.EAL.Handle, b.EALFp16.Handle,
                 b.EAR_R.Handle, b.EAR_K.Handle,
@@ -2505,13 +2505,13 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
             unsafe
             {
                 nint ws = IntPtr.Zero;
-                Check("workspace_alloc", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                Check("workspace_alloc", PearlGemm.GemmNative.WorkspaceAlloc(
                     b.M, b.N, b.K, b.R,
                     withNoiseA: 1, withNoiseB: 1,
                     outWorkspace: &ws, half.Stream.Handle));
                 half.Workspace = ws;
 
-                var nb = new PearlGemm.PearlGemmNative.NoiseBParams
+                var nb = new PearlGemm.GemmNative.NoiseBParams
                 {
                     N           = b.N,
                     K           = b.K,
@@ -2524,7 +2524,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                     BpEB        = b.BpEB.Handle,
                     Workspace   = half.Workspace,
                 };
-                Check("noise_B", PearlGemm.PearlGemmNative.NoiseB(&nb, half.Stream.Handle));
+                Check("noise_B", PearlGemm.GemmNative.NoiseB(&nb, half.Stream.Handle));
             }
         }
         else
@@ -2533,7 +2533,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
             unsafe
             {
                 nint ws = IntPtr.Zero;
-                Check("workspace_alloc", PearlGemm.PearlGemmNative.WorkspaceAlloc(
+                Check("workspace_alloc", PearlGemm.GemmNative.WorkspaceAlloc(
                     b.M, b.N, b.K, b.R,
                     withNoiseA: 1, withNoiseB: 0,
                     outWorkspace: &ws, half.Stream.Handle));
@@ -2544,7 +2544,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
         var bs = bSideSource ?? b;
         unsafe
         {
-            var wp = new PearlGemm.PearlGemmNative.WorkspaceParams
+            var wp = new PearlGemm.GemmNative.WorkspaceParams
             {
                 M = b.M, N = b.N, K = b.K, R = b.R,
                 BM = BM, BN = BN, BK = BK, CM = CM, CN = CN,
@@ -2583,7 +2583,7 @@ internal sealed class GpuWorker : IAsyncDisposable, ILivenessTarget
                 B_scales    = bs.BScales.Handle,
             };
             Check("workspace_install_params",
-                PearlGemm.PearlGemmNative.WorkspaceInstallParams(half.Workspace, &wp));
+                PearlGemm.GemmNative.WorkspaceInstallParams(half.Workspace, &wp));
         }
     }
 }

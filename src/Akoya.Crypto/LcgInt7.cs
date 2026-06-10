@@ -3,7 +3,7 @@ using System;
 namespace Akoya.Crypto;
 
 /// <summary>
-/// Host-side replay of <c>pearl_capi_lcg_int7_fill</c>.
+/// Host-side replay of <c>capi_lcg_int7_fill</c>.
 ///
 /// Byte-identical to the device kernel in
 /// <c>miner/pearl-gemm/csrc/capi/pearl_gemm_capi_util.cu</c> and to the

@@ -1,7 +1,7 @@
-// pearl_gemm_capi_util.cu — small utility kernels for the C-ABI shim.
+// gemm_capi_util.cu — small utility kernels for the C-ABI shim.
 //
 // Currently:
-//   pearl_capi_lcg_int7_fill — deterministic int7 ([-63, +63]) fill of a
+//   capi_lcg_int7_fill — deterministic int7 ([-63, +63]) fill of a
 //                              device buffer keyed by (seed_lo, seed_hi).
 //                              Used by akoya-miner to (re)generate per-iter
 //                              A matrices on-device. Both seeds are passed
@@ -302,7 +302,7 @@ __global__ void lcg_int7_fill_indirect_kernel(
 extern "C" {
 
 PEARL_CAPI_EXPORT
-int pearl_capi_lcg_int7_fill(void* dst,
+int capi_lcg_int7_fill(void* dst,
                              int64_t n,
                              uint64_t seed_lo,
                              uint64_t seed_hi,
@@ -327,7 +327,7 @@ int pearl_capi_lcg_int7_fill(void* dst,
 }
 
 PEARL_CAPI_EXPORT
-int pearl_capi_lcg_int7_fill_indirect(void* dst,
+int capi_lcg_int7_fill_indirect(void* dst,
                                       int64_t n,
                                       const void* seed_lo_base,
                                       uint64_t seed_lo_offset,
@@ -353,7 +353,7 @@ int pearl_capi_lcg_int7_fill_indirect(void* dst,
 }
 
 PEARL_CAPI_EXPORT
-int pearl_capi_bseed_expand_range_raw_device(const uint8_t* bseed,
+int capi_bseed_expand_range_raw_device(const uint8_t* bseed,
                                              uint64_t byte_offset,
                                              void* dst,
                                              int64_t n,
@@ -383,11 +383,11 @@ int pearl_capi_bseed_expand_range_raw_device(const uint8_t* bseed,
 }
 
 PEARL_CAPI_EXPORT
-int pearl_capi_bseed_expand_raw_device(const uint8_t* bseed,
+int capi_bseed_expand_raw_device(const uint8_t* bseed,
                                        void* dst,
                                        int64_t n,
                                        void* stream) {
-  return pearl_capi_bseed_expand_range_raw_device(
+  return capi_bseed_expand_range_raw_device(
       bseed, 0, dst, n, stream);
 }
 

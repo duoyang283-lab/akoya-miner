@@ -26,7 +26,7 @@
 // Full design: see the kernel comment below.
 //
 // This TU exports the host launcher pearl::portable::launch_transcript_gemm_sm100
-// (built into libpearl_gemm_capi.so for PEARL_GEMM_ARCH=b200).  Defining
+// (built into libgemm_capi.so for PEARL_GEMM_ARCH=b200).  Defining
 // PEARL_SM100_VERIFY_MAIN additionally compiles the standalone verify harness.
 //
 // Standalone verify build (from the pearl-gemm root):

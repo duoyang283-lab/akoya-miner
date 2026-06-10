@@ -8,8 +8,8 @@
 //   # → target/release/libpearl_mining.so (we typically rename to
 //   #   libpearl_mining_capi.so to disambiguate from the Python build)
 //
-// Caller sets AKOYA_PEARL_MINING_LIB to the absolute path of the .so;
-// if unset we fall back to "libpearl_mining_capi.so" on PATH.
+// Caller sets NW_PEARL_MINING_LIB to the absolute path of the .so;
+// if unset we fall back to "libmining.so" on PATH.
 //
 // All entry points return int (0 = success, non-zero = error). On error
 // the optional `err_msg` out-pointer is set to a NUL-terminated string
@@ -19,11 +19,11 @@ using System.Runtime.InteropServices;
 
 namespace Akoya.Mining;
 
-public static unsafe partial class PearlMiningNative
+public static unsafe partial class MiningNative
 {
-    public const string Lib = "pearl_mining_capi";
+    public const string Lib = "mining";
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_version")]
+    [LibraryImport(Lib, EntryPoint = "capi_version")]
     public static partial uint Version();
 
     // The V1 plain-proof pack / verify / diagnose entry points were removed
@@ -32,10 +32,10 @@ public static unsafe partial class PearlMiningNative
     // Buffer/string free helpers remain because MerkleRootAndProof still
     // uses them.
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_free_buffer")]
+    [LibraryImport(Lib, EntryPoint = "capi_free_buffer")]
     public static partial void FreeBuffer(byte* ptr, nuint len);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_free_string")]
+    [LibraryImport(Lib, EntryPoint = "capi_free_string")]
     public static partial void FreeString(byte* ptr);
 
     /// <summary>
@@ -43,7 +43,7 @@ public static unsafe partial class PearlMiningNative
     /// `pearl-blake3::blake3_digest(data, Some(key))`. Used to recompute,
     /// host-side, the hash that an on-device `tensor_hash` SHOULD produce.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_blake3_keyed")]
+    [LibraryImport(Lib, EntryPoint = "capi_blake3_keyed")]
     public static partial int Blake3Keyed(
         byte* dataPtr, nuint dataLen,
         byte* keyPtr,             // 32
@@ -53,7 +53,7 @@ public static unsafe partial class PearlMiningNative
     /// <summary>
     /// Compute the BLAKE3 keyed Merkle root using the canonical Rust implementation.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_root")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_root")]
     public static partial int MerkleRoot(
         byte* dataPtr, nuint dataLen,
         byte* keyPtr,             // 32
@@ -64,7 +64,7 @@ public static unsafe partial class PearlMiningNative
     /// Fused BSeed XOF expansion, int7 mapping, and keyed-BLAKE3 Merkle root.
     /// Used by pool-side share verification for the HashB derivation path.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_and_merkle")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_and_merkle")]
     public static partial int BSeedExpandAndMerkle(
         byte* bseedPtr,            // 32
         nuint n,
@@ -77,7 +77,7 @@ public static unsafe partial class PearlMiningNative
     /// BSeed XOF expansion and int7 mapping into a caller-owned row-major B buffer.
     /// Does not pad or compute a Merkle root. Intended for miner GPU upload.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_raw")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_raw")]
     public static partial int BSeedExpandRaw(
         byte* bseedPtr,            // 32
         nuint n,
@@ -91,7 +91,7 @@ public static unsafe partial class PearlMiningNative
     /// Equivalent to slicing the raw full expansion at <paramref name="byteOffset"/>,
     /// without materialising skipped bytes.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_expand_range_raw")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_expand_range_raw")]
     public static partial int BSeedExpandRangeRaw(
         byte* bseedPtr,            // 32
         ulong byteOffset,
@@ -103,7 +103,7 @@ public static unsafe partial class PearlMiningNative
     /// Verify a multi-leaf Merkle proof using the canonical Rust implementation.
     /// Returns 0 if the proof is valid, non-zero with error message on failure.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_verify_proof")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_verify_proof")]
     public static partial int MerkleVerifyProof(
         byte* leafDataPtr,        // leaf_count * 1024 bytes contiguous
         uint* leafIndicesPtr,     // leaf_count u32 values
@@ -123,7 +123,7 @@ public static unsafe partial class PearlMiningNative
     /// <see cref="FreeBuffer"/>; free <paramref name="outLeafIndices"/> with
     /// <see cref="FreeU32Buffer"/>.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_root_and_proof")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_root_and_proof")]
     public static partial int MerkleRootAndProof(
         byte* dataPtr, nuint dataLen,
         byte* keyPtr,                  // 32
@@ -143,7 +143,7 @@ public static unsafe partial class PearlMiningNative
     /// Free <paramref name="outLeafIndices"/> with <see cref="FreeU32Buffer"/>
     /// and <paramref name="outSiblings"/> with <see cref="FreeBuffer"/>.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_proof_from_leaf_cvs")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_proof_from_leaf_cvs")]
     public static partial int MerkleProofFromLeafCvs(
         byte* leafCvsPtr, nuint leafCvsLen,
         byte* leafDataPtr, nuint leafDataLen,
@@ -162,7 +162,7 @@ public static unsafe partial class PearlMiningNative
     /// <see cref="MerkleRootAndProof"/>. <paramref name="len"/> is the number
     /// of u32 elements (not bytes).
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_free_u32_buffer")]
+    [LibraryImport(Lib, EntryPoint = "capi_free_u32_buffer")]
     public static partial void FreeU32Buffer(uint* ptr, nuint len);
 
     /// <summary>
@@ -172,7 +172,7 @@ public static unsafe partial class PearlMiningNative
     /// O(data_len) BLAKE3 cost when the tree is constant per-σ (B matrix).
     /// Caller MUST free the handle with <see cref="MerkleTreeFree"/>.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_build_tree")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_build_tree")]
     public static partial int MerkleBuildTree(
         byte* dataPtr, nuint dataLen,
         byte* keyPtr,                  // 32
@@ -182,7 +182,7 @@ public static unsafe partial class PearlMiningNative
         uint* outTotalLeaves,
         byte** errMsgPtr);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_merkle_build_tree_from_leaf_cvs")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_merkle_build_tree_from_leaf_cvs")]
     public static partial int BSeedMerkleBuildTreeFromLeafCvs(
         byte* leafCvsPtr, nuint leafCvsLen,
         byte* bseedPtr,                 // 32
@@ -199,7 +199,7 @@ public static unsafe partial class PearlMiningNative
     /// <see cref="MerkleBuildTree"/>. Does NOT free the handle. Output
     /// buffer ownership mirrors <see cref="MerkleRootAndProof"/>.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_proof_for_handle")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_proof_for_handle")]
     public static partial int MerkleProofForHandle(
         void* handle,
         uint* rowIndicesPtr, nuint rowIndicesLen,
@@ -208,7 +208,7 @@ public static unsafe partial class PearlMiningNative
         byte** outSiblings, nuint* outSiblingCount,
         byte** errMsgPtr);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_merkle_proof_for_handle")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_merkle_proof_for_handle")]
     public static partial int BSeedMerkleProofForHandle(
         void* handle,
         uint* rowIndicesPtr, nuint rowIndicesLen,
@@ -225,14 +225,14 @@ public static unsafe partial class PearlMiningNative
     /// <see cref="FreeBuffer"/> using <paramref name="outSiblingBytes"/> as
     /// the length.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_audit_paths_for_handle")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_audit_paths_for_handle")]
     public static partial int MerkleAuditPathsForHandle(
         void* handle,
         uint* leafIndicesPtr, nuint leafIndicesLen,
         byte** outSiblings, nuint* outSiblingBytes,
         byte** errMsgPtr);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_merkle_audit_paths_for_handle")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_merkle_audit_paths_for_handle")]
     public static partial int BSeedMerkleAuditPathsForHandle(
         void* handle,
         uint* leafIndicesPtr, nuint leafIndicesLen,
@@ -243,9 +243,9 @@ public static unsafe partial class PearlMiningNative
     /// Free a Merkle tree handle previously returned by
     /// <see cref="MerkleBuildTree"/>. Safe to call with <see cref="IntPtr.Zero"/>.
     /// </summary>
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_merkle_tree_free")]
+    [LibraryImport(Lib, EntryPoint = "capi_merkle_tree_free")]
     public static partial void MerkleTreeFree(void* handle);
 
-    [LibraryImport(Lib, EntryPoint = "pearl_capi_bseed_merkle_tree_free")]
+    [LibraryImport(Lib, EntryPoint = "capi_bseed_merkle_tree_free")]
     public static partial void BSeedMerkleTreeFree(void* handle);
 }

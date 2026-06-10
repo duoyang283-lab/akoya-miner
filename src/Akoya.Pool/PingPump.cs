@@ -1,7 +1,7 @@
 // PingPump — periodic PingEvent → MiningSession; on Pong, records RTT.
 //
 // V2 introduces a separate Ping/Pong RTT probe (was bundled into v1
-// Heartbeat). Cadence is operator-configurable (AKOYA_POOL_PING_INTERVAL_SEC).
+// Heartbeat). Cadence is operator-configurable (NW_POOL_PING_INTERVAL_SEC).
 //
 // Ping/Pong are unmatched at the protocol level (both messages carry only a
 // timestamp). We assume FIFO under a single in-flight stream and treat any
@@ -13,7 +13,7 @@
 // The pump injects RTT into `IRttSink` (typically `Metrics.SetPoolLatencyMs`).
 
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Pool;
 

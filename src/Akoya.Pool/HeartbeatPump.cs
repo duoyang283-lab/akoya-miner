@@ -11,7 +11,7 @@
 // concern. (In practice this is fed by Metrics.GetSnapshot()-derived values.)
 
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Pool;
 

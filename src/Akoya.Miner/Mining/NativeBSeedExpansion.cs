@@ -32,7 +32,7 @@ internal static class NativeBSeedExpansion
             fixed (byte* pSeed = bSeed)
             fixed (byte* pOut = destination)
             {
-                int rc = PearlMiningNative.BSeedExpandRangeRaw(
+                int rc = MiningNative.BSeedExpandRangeRaw(
                     pSeed,
                     byteOffset,
                     pOut,
@@ -50,12 +50,12 @@ internal static class NativeBSeedExpansion
         catch (EntryPointNotFoundException ex)
         {
             throw new InvalidOperationException(
-                "Native BSeed range expansion requires pearl_capi_bseed_expand_range_raw. Rebuild the pearl mining CAPI library.",
+                "Native BSeed range expansion requires capi_bseed_expand_range_raw. Rebuild the pearl mining CAPI library.",
                 ex);
         }
         finally
         {
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 
@@ -67,7 +67,7 @@ internal static class NativeBSeedExpansion
             fixed (byte* pSeed = bSeed)
             fixed (byte* pOut = destination)
             {
-                int rc = PearlMiningNative.BSeedExpandRaw(
+                int rc = MiningNative.BSeedExpandRaw(
                     pSeed,
                     (nuint)n,
                     (nuint)k,
@@ -86,12 +86,12 @@ internal static class NativeBSeedExpansion
         catch (EntryPointNotFoundException ex)
         {
             throw new InvalidOperationException(
-                "Native BSeed expansion requires pearl_capi_bseed_expand_raw. Rebuild the pearl mining CAPI library.",
+                "Native BSeed expansion requires capi_bseed_expand_raw. Rebuild the pearl mining CAPI library.",
                 ex);
         }
         finally
         {
-            if (errMsg != null) PearlMiningNative.FreeString(errMsg);
+            if (errMsg != null) MiningNative.FreeString(errMsg);
         }
     }
 }

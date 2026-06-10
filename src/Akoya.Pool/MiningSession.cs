@@ -21,7 +21,7 @@
 using System.Threading.Channels;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
-using PearlPool.Proto.V2;
+using Pool.Proto.V2;
 
 namespace Akoya.Pool;
 
@@ -95,7 +95,7 @@ public sealed class MiningSession : IAsyncDisposable, IEventSink
     //     otherwise we refresh it to "now" (we don't know the exact second-
     //     oldest, but it's guaranteed not older than now).
     // Default deadline 20s = ~1.3× ping interval. Override via
-    // AKOYA_POOL_PONG_TIMEOUT_SEC; 0 disables this check.
+    // NW_POOL_PONG_TIMEOUT_SEC; 0 disables this check.
     private long _oldestPendingPingTicks;
     private int  _pendingPingCount;
 
@@ -231,7 +231,7 @@ public sealed class MiningSession : IAsyncDisposable, IEventSink
                 _pool.Endpoint,
                 $"pool unreachable: gRPC {e.StatusCode} after {RegisterResumeDeadline.TotalSeconds:F0}s " +
                 $"connecting to {_pool.Endpoint} — verify host/port and firewall " +
-                $"(AKOYA_POOL_HOST / AKOYA_POOL_PORT)",
+                $"(NW_POOL_HOST / NW_POOL_PORT)",
                 e);
         }
         catch (OperationCanceledException oce)
@@ -244,7 +244,7 @@ public sealed class MiningSession : IAsyncDisposable, IEventSink
                 _pool.Endpoint,
                 $"pool unreachable: timed out after {RegisterResumeDeadline.TotalSeconds:F0}s " +
                 $"connecting to {_pool.Endpoint} (gRPC channel never became ready) — " +
-                $"verify host/port and firewall (AKOYA_POOL_HOST / AKOYA_POOL_PORT)",
+                $"verify host/port and firewall (NW_POOL_HOST / NW_POOL_PORT)",
                 oce);
         }
 

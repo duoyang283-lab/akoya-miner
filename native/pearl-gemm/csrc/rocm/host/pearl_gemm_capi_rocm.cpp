@@ -1,4 +1,4 @@
-// pearl_gemm_capi_rocm.cpp — ROCm/MI300X backend for the stable pearl_capi_* C ABI.
+// gemm_capi_rocm.cpp — ROCm/MI300X backend for the stable capi_* C ABI.
 //
 // Implements the C ABI (reusing the canonical header for struct layouts) on top
 // of the validated HIP kernels in pearl_kernels.cuh. Correctness-first: the GEMM
@@ -6,10 +6,10 @@
 // of the ABI to drive the miner's iter loop on gfx942.
 //
 //   hipcc --offload-arch=gfx942 -O3 -fPIC -shared \
-//     -I ../../../csrc -I .. pearl_gemm_capi_rocm.cpp -o libpearl_gemm_capi.so
+//     -I ../../../csrc -I .. gemm_capi_rocm.cpp -o libgemm_capi.so
 
 #include "../pearl_kernels.cuh"
-#include "capi/pearl_gemm_capi.h"
+#include "capi/gemm_capi.h"
 #include <cstdlib>
 #include <cstring>
 
@@ -36,17 +36,17 @@ struct RocmWorkspace {
   int8_t* Bnk;                           // BpEB[n,k]  (hand-MFMA pp kernel, K-contiguous/col)
   uint8_t* dHeader;                      // device HostSignalHeader (winning tile), copied to pinned on iter
   int32_t* gemmScratch;                  // m*k int32 for noise_A E_A
-  PearlCapiWorkspaceParams params; bool installed=false;
+  CapiWorkspaceParams params; bool installed=false;
 };
 
 extern "C" {
 
-int pearl_capi_abi_version(void){ return 2; }
-const char* pearl_capi_build_profile(void){ return "mi300x"; }
-int pearl_capi_supports_sm(int,int){ return 1; }
-int pearl_capi_get_host_signal_sync_size(void){ return 8; }
-int pearl_capi_get_host_signal_header_size(void){ return 640; }
-int64_t pearl_capi_get_required_scratchpad_bytes(int64_t matrix_bytes,int){
+int capi_abi_version(void){ return 2; }
+const char* capi_build_profile(void){ return "mi300x"; }
+int capi_supports_sm(int,int){ return 1; }
+int capi_get_host_signal_sync_size(void){ return 8; }
+int capi_get_host_signal_header_size(void){ return 640; }
+int64_t capi_get_required_scratchpad_bytes(int64_t matrix_bytes,int){
   int64_t nchunks=(matrix_bytes+1023)/1024; if(nchunks<1)nchunks=1;
   return 2*nchunks*32 + 4096;   // ping-pong leaf CVs for parallel Merkle reduction
 }
@@ -71,33 +71,33 @@ static void parallel_tensor_hash(const uint8_t* data,long len,const u32* key,
   }
 }
 
-int pearl_capi_lcg_int7_fill(void* dst,int64_t n,uint64_t seed_lo,uint64_t seed_hi,void* stream){
+int capi_lcg_int7_fill(void* dst,int64_t n,uint64_t seed_lo,uint64_t seed_hi,void* stream){
   int blk=(int)((n/8+63)/64); if(blk<1)blk=1;
   hipLaunchKernelGGL(pk::k_lcg,dim3(blk),dim3(64),0,HSTREAM(stream),(int8_t*)dst,(long)n,seed_lo,seed_hi);
   return rc_at(hipGetLastError(),"lcg");
 }
-int pearl_capi_lcg_int7_fill_indirect(void*,int64_t,const void*,uint64_t,uint64_t,void*){ return -1; }
+int capi_lcg_int7_fill_indirect(void*,int64_t,const void*,uint64_t,uint64_t,void*){ return -1; }
 
-int pearl_capi_tensor_hash(const uint8_t* data,uint32_t data_size,uint8_t* out,const uint8_t* key,
+int capi_tensor_hash(const uint8_t* data,uint32_t data_size,uint8_t* out,const uint8_t* key,
                            uint32_t,uint32_t,uint32_t,uint32_t,uint8_t* roots,int,void* stream){
   hipLaunchKernelGGL(pk::k_tensor_hash,dim3(1),dim3(1),0,HSTREAM(stream),
     data,(long)data_size,(const u32*)key,1,(u32*)roots,out);
   return rc_at(hipGetLastError(),"tensor_hash");
 }
-int pearl_capi_tensor_hash_leaf_cvs(const uint8_t* d,uint32_t s,uint8_t* o,const uint8_t* k,
+int capi_tensor_hash_leaf_cvs(const uint8_t* d,uint32_t s,uint8_t* o,const uint8_t* k,
                                     uint32_t,uint32_t,uint32_t,uint32_t,uint8_t* r,uint8_t* leaf_cvs,int,void* st){
   // Parallel Merkle tensor_hash that ALSO exports per-leaf CVs (r = Roots scratch).
   parallel_tensor_hash(d,(long)s,(const u32*)k,(u32*)r,o,HSTREAM(st),leaf_cvs);
   return rc_at(hipGetLastError(),"tensor_hash_leaf_cvs");
 }
 
-int pearl_capi_commitment_hash_from_merkle_roots(const uint8_t* A,const uint8_t* B,const uint8_t* key,
+int capi_commitment_hash_from_merkle_roots(const uint8_t* A,const uint8_t* B,const uint8_t* key,
                                                  uint8_t* CA,uint8_t* CB,int,void* stream){
   hipLaunchKernelGGL(pk::k_commitment,dim3(1),dim3(1),0,HSTREAM(stream),A,B,key,CA,CB);
   return rc_at(hipGetLastError(),"commitment");
 }
 
-int pearl_capi_noise_gen(int R,int m,int n,int k,
+int capi_noise_gen(int R,int m,int n,int k,
                          void* EAL,void* EAL_fp16,void* EAR_R,void* EAR_K,
                          void* EBL_R,void* EBL_K,void* EBR,void* EBR_fp16,
                          const uint8_t* key_A,const uint8_t* key_B,void* stream){
@@ -113,16 +113,16 @@ int pearl_capi_noise_gen(int R,int m,int n,int k,
   return rc_at(hipGetLastError(),"noise_gen");
 }
 
-int pearl_capi_bseed_expand_raw_device(const uint8_t* bseed,void* dst,int64_t n,void* stream){
+int capi_bseed_expand_raw_device(const uint8_t* bseed,void* dst,int64_t n,void* stream){
   u32 sw[8]; for(int i=0;i<8;++i)sw[i]=(u32)bseed[i*4]|((u32)bseed[i*4+1]<<8)|((u32)bseed[i*4+2]<<16)|((u32)bseed[i*4+3]<<24);
   u32* dsw; hipMalloc(&dsw,32); hipMemcpyAsync(dsw,sw,32,hipMemcpyHostToDevice,HSTREAM(stream));
   long nblk=(n+63)/64; hipLaunchKernelGGL(pk::k_bseed,dim3((nblk+63)/64),dim3(64),0,HSTREAM(stream),dsw,(int8_t*)dst,(long)n);
   return rc_at(hipGetLastError(),"bseed");
 }
-int pearl_capi_bseed_expand_range_raw_device(const uint8_t*,uint64_t,void*,int64_t,void*){ return -1; }
+int capi_bseed_expand_range_raw_device(const uint8_t*,uint64_t,void*,int64_t,void*){ return -1; }
 
 // ── workspace + iter ─────────────────────────────────────────────────────────
-int pearl_capi_workspace_alloc(int32_t m,int32_t n,int32_t k,int32_t r,int,int,void** out,void*){
+int capi_workspace_alloc(int32_t m,int32_t n,int32_t k,int32_t r,int,int,void** out,void*){
   auto* w=new RocmWorkspace(); w->m=m;w->n=n;w->k=k;w->r=r; w->ntiles=(m/16)*(n/16);
   hipMalloc(&w->tr,(size_t)w->ntiles*16*4); hipMalloc(&w->ph,(size_t)w->ntiles*32);
   hipMalloc(&w->fnd,(size_t)w->ntiles*4); hipMalloc(&w->Bn,(size_t)k*n);
@@ -131,11 +131,11 @@ int pearl_capi_workspace_alloc(int32_t m,int32_t n,int32_t k,int32_t r,int,int,v
   hipMalloc(&w->gemmScratch,(size_t)m*k*4);
   *out=w; return 0;
 }
-int pearl_capi_workspace_free(void* ws,void*){
+int capi_workspace_free(void* ws,void*){
   auto* w=(RocmWorkspace*)ws; if(!w)return -1;
   hipFree(w->tr);hipFree(w->ph);hipFree(w->fnd);hipFree(w->Bn);hipFree(w->Bnk);hipFree(w->dHeader);hipFree(w->gemmScratch); delete w; return 0;
 }
-int pearl_capi_workspace_install_params(void* ws,const PearlCapiWorkspaceParams* p){
+int capi_workspace_install_params(void* ws,const CapiWorkspaceParams* p){
   auto* w=(RocmWorkspace*)ws; if(!w||!p)return -1; w->params=*p; w->installed=true;
   // Pre-transpose BpEB[n,k] → Bn[k,n] (σ-constant, rocWMMA fallback).
   hipLaunchKernelGGL(pk::k_transpose_i8,dim3((w->n*w->k+255)/256),dim3(256),0,0,(const int8_t*)p->BpEB,w->Bn,w->n,w->k);
@@ -144,18 +144,18 @@ int pearl_capi_workspace_install_params(void* ws,const PearlCapiWorkspaceParams*
   hipDeviceSynchronize(); return 0;
 }
 
-int pearl_capi_iter(void* ws,uint64_t seed_lo,void* host_signal_header_pinned,void* stream){
+int capi_iter(void* ws,uint64_t seed_lo,void* host_signal_header_pinned,void* stream){
   auto* w=(RocmWorkspace*)ws; if(!w||!w->installed)return -3;
-  const PearlCapiWorkspaceParams& p=w->params; hipStream_t s=HSTREAM(stream);
+  const CapiWorkspaceParams& p=w->params; hipStream_t s=HSTREAM(stream);
   int m=w->m,n=w->n,k=w->k,r=w->r;
   // 1. A = lcg
-  pearl_capi_lcg_int7_fill(p.A,(int64_t)m*k,seed_lo,p.sigma_seed,stream);
+  capi_lcg_int7_fill(p.A,(int64_t)m*k,seed_lo,p.sigma_seed,stream);
   // 2. AHash — parallel Merkle tensor_hash
   parallel_tensor_hash((const uint8_t*)p.A,(long)m*k,(const u32*)p.Key,(u32*)p.Roots,(uint8_t*)p.AHash,s);
   // 3. commitment
   hipLaunchKernelGGL(pk::k_commitment,dim3(1),dim3(1),0,s,(const uint8_t*)p.AHash,(const uint8_t*)p.BHash,(const uint8_t*)p.Key,(uint8_t*)p.CommitA,(uint8_t*)p.CommitB);
   // 4. noise_gen A-side keyed by CommitA
-  pearl_capi_noise_gen(r,m,n,k,p.EAL,p.EAL_fp16,p.EAR_R_major,p.EAR_K_major,nullptr,nullptr,nullptr,nullptr,(const uint8_t*)p.CommitA,nullptr,stream);
+  capi_noise_gen(r,m,n,k,p.EAL,p.EAL_fp16,p.EAR_R_major,p.EAR_K_major,nullptr,nullptr,nullptr,nullptr,(const uint8_t*)p.CommitA,nullptr,stream);
   // E_A = EAL[m,r] @ EAR_K[r,k]; ApEA = A + int8(E_A)
   { dim3 g(k/16,m/16); hipLaunchKernelGGL(pk::k_wmma_gemm,g,dim3(64),0,s,(const int8_t*)p.EAL,(const int8_t*)p.EAR_K_major,w->gemmScratch,m,k,r);}
   hipLaunchKernelGGL(pk::k_add_i8,dim3((m*k+255)/256),dim3(256),0,s,(const int8_t*)p.A,w->gemmScratch,(int8_t*)p.ApEA,m*k);
@@ -180,16 +180,16 @@ int pearl_capi_iter(void* ws,uint64_t seed_lo,void* host_signal_header_pinned,vo
   if(host_signal_header_pinned) hipMemcpyAsync(host_signal_header_pinned,w->dHeader,640,hipMemcpyDeviceToHost,s);
   return rc_ok(hipGetLastError());
 }
-int pearl_capi_iter_batch(void* ws,uint64_t seed_lo_start,void* const* hdrs,int32_t count,void* stream){
-  for(int i=0;i<count;++i){ int rc=pearl_capi_iter(ws,seed_lo_start+(uint64_t)i,hdrs?hdrs[i]:nullptr,stream); if(rc)return rc; }
+int capi_iter_batch(void* ws,uint64_t seed_lo_start,void* const* hdrs,int32_t count,void* stream){
+  for(int i=0;i<count;++i){ int rc=capi_iter(ws,seed_lo_start+(uint64_t)i,hdrs?hdrs[i]:nullptr,stream); if(rc)return rc; }
   return 0;
 }
-int pearl_capi_iter_batch_graph_prepare(void*,void* const*,int32_t,void*){ return -1; }  // no graph → C# falls back
-int pearl_capi_iter_batch_graph_launch(void*,uint64_t,void*){ return -1; }
+int capi_iter_batch_graph_prepare(void*,void* const*,int32_t,void*){ return -1; }  // no graph → C# falls back
+int capi_iter_batch_graph_launch(void*,uint64_t,void*){ return -1; }
 
 // noise_B: BpEB[n,k] = (Bᵀ + int8(EBL_R·EBRᵀ))ᵀ. (EARxBpEB is a denoise term not
 // used by the PoW/transcript path — left as-is.)
-int pearl_capi_noise_B(const struct PearlCapiNoiseBParams* p,void* stream){
+int capi_noise_B(const struct CapiNoiseBParams* p,void* stream){
   if(!p) return -1; hipStream_t s=HSTREAM(stream);
   int n=p->n,k=p->k,r=p->r;
   int8_t *EBRt,*Bkn,*Bnoi; int32_t* EB;
@@ -204,12 +204,12 @@ int pearl_capi_noise_B(const struct PearlCapiNoiseBParams* p,void* stream){
   return rc_ok(hipGetLastError());
 }
 
-int pearl_capi_install_B(const struct PearlCapiInstallBParams* p,void* stream){
+int capi_install_B(const struct CapiInstallBParams* p,void* stream){
   if(!p) return -1;
   hipStream_t s=HSTREAM(stream);
   // 1. B (optionally expanded from BSeed) → BHash = tensor_hash(B, Key)
   if(p->expand_bseed && p->bseed){
-    int rc=pearl_capi_bseed_expand_raw_device((const uint8_t*)p->bseed,p->B,(int64_t)p->n*p->k,stream); if(rc)return rc;
+    int rc=capi_bseed_expand_raw_device((const uint8_t*)p->bseed,p->B,(int64_t)p->n*p->k,stream); if(rc)return rc;
     if(rc_at(hipStreamSynchronize(s),"install_B.bseed")) return -100;
   }
   // Also export the per-leaf BLAKE3 CVs so the host builds the B Merkle tree
@@ -218,21 +218,21 @@ int pearl_capi_install_B(const struct PearlCapiInstallBParams* p,void* stream){
   parallel_tensor_hash((const uint8_t*)p->B,(long)p->n*p->k,(const u32*)p->Key,(u32*)p->Roots,(uint8_t*)p->BHash,s,(uint8_t*)p->LeafCvs);
   if(rc_at(hipStreamSynchronize(s),"install_B.tensor_hash")) return -100;
   // 2. commitment_hash(AHash, BHash, Key) → CommitA, CommitB
-  int rc=pearl_capi_commitment_hash_from_merkle_roots((const uint8_t*)p->AHash,(const uint8_t*)p->BHash,
+  int rc=capi_commitment_hash_from_merkle_roots((const uint8_t*)p->AHash,(const uint8_t*)p->BHash,
         (const uint8_t*)p->Key,(uint8_t*)p->CommitA,(uint8_t*)p->CommitB,p->device_id,stream); if(rc)return rc;
   if(rc_at(hipStreamSynchronize(s),"install_B.commitment")) return -100;
   // 3. noise_gen: EAR keyed by CommitA; EBR/EBL keyed by CommitB
-  rc=pearl_capi_noise_gen(p->r,p->m,p->n,p->k, nullptr,nullptr, nullptr,p->EAR_K_major,
+  rc=capi_noise_gen(p->r,p->m,p->n,p->k, nullptr,nullptr, nullptr,p->EAR_K_major,
         p->EBL_R_major,p->EBL_K_major, p->EBR,p->EBR_fp16,
         (const uint8_t*)p->CommitA,(const uint8_t*)p->CommitB,stream); if(rc)return rc;
   if(rc_at(hipStreamSynchronize(s),"install_B.noise_gen")) return -100;
   // 4. noise_B → BpEB
-  PearlCapiNoiseBParams nb{}; nb.n=p->n; nb.k=p->k; nb.r=p->r;
+  CapiNoiseBParams nb{}; nb.n=p->n; nb.k=p->k; nb.r=p->r;
   nb.B=p->B; nb.EAR_K_major=p->EAR_K_major; nb.EBL_R_major=p->EBL_R_major;
   nb.EBR=p->EBR; nb.EARxBpEB=p->EARxBpEB; nb.BpEB=p->BpEB; nb.workspace=p->workspace;
-  return pearl_capi_noise_B(&nb,stream);
+  return capi_noise_B(&nb,stream);
 }
 
-int pearl_capi_noisy_gemm(const struct PearlCapiNoisyGemmParams*,void*){ return -1; }  // iter path bypasses this
+int capi_noisy_gemm(const struct CapiNoisyGemmParams*,void*){ return -1; }  // iter path bypasses this
 
 } // extern "C"

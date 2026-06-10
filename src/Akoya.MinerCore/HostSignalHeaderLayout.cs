@@ -26,7 +26,7 @@
 //
 // The host_signal_header_size constant on the C side is
 //   ((sizeof(HostSignalHeader) + 127) / 128) * 128.
-// We never assume a specific value — Akoya.PearlGemm.PearlGemmNative
+// We never assume a specific value — Akoya.PearlGemm.GemmNative
 // .GetHostSignalHeaderSize() is queried at runtime.
 
 namespace Akoya.MinerCore;

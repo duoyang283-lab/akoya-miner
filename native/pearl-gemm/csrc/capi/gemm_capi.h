@@ -1,7 +1,7 @@
-// pearl_gemm_capi.h — public C ABI for pearl-gemm kernels.
+// gemm_capi.h — public C ABI for pearl-gemm kernels.
 //
 // Stable C-language interface — narrow to what the miner actually uses.
-// Compiled into the torch-free libpearl_gemm_capi.so.
+// Compiled into the torch-free libgemm_capi.so.
 //
 // Status code convention:
 //   0   success
@@ -31,21 +31,21 @@ extern "C" {
 #endif
 
 // ABI version. Bumped on incompatible signature changes.
-int pearl_capi_abi_version(void);
+int capi_abi_version(void);
 
 // Native build profile reporting. Used by miner startup to fail fast when a
 // loaded architecture-specific .so cannot run on the selected GPU.
-const char* pearl_capi_build_profile(void);
-int pearl_capi_supports_sm(int major, int minor);
+const char* capi_build_profile(void);
+int capi_supports_sm(int major, int minor);
 
 // Sizes (bytes).
-int     pearl_capi_get_host_signal_sync_size(void);
-int     pearl_capi_get_host_signal_header_size(void);
-int64_t pearl_capi_get_required_scratchpad_bytes(int64_t matrix_bytes,
+int     capi_get_host_signal_sync_size(void);
+int     capi_get_host_signal_header_size(void);
+int64_t capi_get_required_scratchpad_bytes(int64_t matrix_bytes,
                                                  int     threads_per_block);
 
 // tensor_hash on a flat byte buffer. All pointers are device pointers.
-int pearl_capi_tensor_hash(const uint8_t* data,
+int capi_tensor_hash(const uint8_t* data,
                            uint32_t        data_size,
                            uint8_t*        out,
                            const uint8_t*  key,
@@ -59,7 +59,7 @@ int pearl_capi_tensor_hash(const uint8_t* data,
 
 // tensor_hash plus the per-1024-byte leaf chaining values. All pointers are
 // device pointers. `leaf_cvs` must have ceil(data_size / 1024) * 32 bytes.
-int pearl_capi_tensor_hash_leaf_cvs(const uint8_t* data,
+int capi_tensor_hash_leaf_cvs(const uint8_t* data,
                                     uint32_t       data_size,
                                     uint8_t*       out,
                                     const uint8_t* key,
@@ -75,7 +75,7 @@ int pearl_capi_tensor_hash_leaf_cvs(const uint8_t* data,
 // Fused BSeed expansion + tensor_hash for resident B install. `bseed` is a
 // host pointer to the 32-byte BSeed. All other pointers are device pointers.
 // Writes generated B into `data` and the Merkle root into `out`.
-int pearl_capi_bseed_expand_and_tensor_hash(const uint8_t* bseed,
+int capi_bseed_expand_and_tensor_hash(const uint8_t* bseed,
                                             uint8_t*       data,
                                             uint32_t       data_size,
                                             uint8_t*       out,
@@ -88,7 +88,7 @@ int pearl_capi_bseed_expand_and_tensor_hash(const uint8_t* bseed,
                                             int            device_id,
                                             void*          stream);
 
-int pearl_capi_bseed_expand_and_tensor_hash_leaf_cvs(
+int capi_bseed_expand_and_tensor_hash_leaf_cvs(
                                             const uint8_t* bseed,
                                             uint8_t*       data,
                                             uint32_t       data_size,
@@ -103,7 +103,7 @@ int pearl_capi_bseed_expand_and_tensor_hash_leaf_cvs(
                                             int            device_id,
                                             void*          stream);
 
-int pearl_capi_commitment_hash_from_merkle_roots(const uint8_t* A_merkle_root,
+int capi_commitment_hash_from_merkle_roots(const uint8_t* A_merkle_root,
                                                  const uint8_t* B_merkle_root,
                                                  const uint8_t* key,
                                                  uint8_t*       A_commitment_hash,
@@ -114,7 +114,7 @@ int pearl_capi_commitment_hash_from_merkle_roots(const uint8_t* A_merkle_root,
 // noise_gen. Any nullptr device pointer means the caller does not want
 // that noise matrix populated. R must be 64 or 128. num_threads is fixed
 // at 64 inside the shim (matches pure-miner Python default).
-int pearl_capi_noise_gen(int R,
+int capi_noise_gen(int R,
                          int m, int n, int k,
                          void* EAL, void* EAL_fp16,
                          void* EAR_R_major, void* EAR_K_major,
@@ -124,7 +124,7 @@ int pearl_capi_noise_gen(int R,
                          void* stream);
 
 // noise_B (σ-refresh only — runs once per σ to compute BpEB = B + EBL·EBR).
-struct PearlCapiNoiseBParams {
+struct CapiNoiseBParams {
     int32_t n, k, r;
     void* B;            // n x k  int8
     void* EAR_K_major;  // r x k  int8
@@ -133,13 +133,13 @@ struct PearlCapiNoiseBParams {
     void* EARxBpEB;     // n x r  fp16  (write-only, value discarded)
     void* BpEB;         // n x k  int8
 
-    // Optional pre-allocated workspace (PearlCapiWorkspace*). When non-null,
+    // Optional pre-allocated workspace (CapiWorkspace*). When non-null,
     // noise_B uses the workspace's noise_B scratchpad instead of
     // cudaMallocAsync-ing a fresh buffer per call. When null, falls back to
     // the per-call alloc/free path. (ABI v2.)
     void* workspace;
 };
-int pearl_capi_noise_B(const struct PearlCapiNoiseBParams* p, void* stream);
+int capi_noise_B(const struct CapiNoiseBParams* p, void* stream);
 
 // Full native B-side σ install. The caller must have already computed AHash
 // for the throwaway A seed. If `expand_bseed != 0`, `bseed` must point to the
@@ -150,7 +150,7 @@ int pearl_capi_noise_B(const struct PearlCapiNoiseBParams* p, void* stream);
 //   commitment_hash(AHash, BHash) -> CommitA/CommitB
 //   noise_gen(B-side only)
 //   noise_B(B, EBR, EBL, EAR) -> BpEB/EARxBpEB
-struct PearlCapiInstallBParams {
+struct CapiInstallBParams {
     int32_t m, n, k, r;
     int32_t expand_bseed;
     uint32_t th_num_blocks;
@@ -177,11 +177,11 @@ struct PearlCapiInstallBParams {
     void* workspace;
     void* LeafCvs;  // optional total_leaves x 32B device buffer
 };
-int pearl_capi_install_B(const struct PearlCapiInstallBParams* p,
+int capi_install_B(const struct CapiInstallBParams* p,
                          void* stream);
 
 // noisy_gemm — the hot inner-loop kernel.
-struct PearlCapiNoisyGemmParams {
+struct CapiNoisyGemmParams {
     // Dimensions.
     int32_t m, n, k, r;
 
@@ -211,7 +211,7 @@ struct PearlCapiNoisyGemmParams {
     void* pow_target;                // device, uint32 [8]
     void* pow_key;                   // device, uint32 [8]
 
-    // Optional pre-allocated workspace (PearlCapiWorkspace*). When non-null,
+    // Optional pre-allocated workspace (CapiWorkspace*). When non-null,
     // noisy_gemm uses the workspace's noiseA scratchpad + transcript buffer
     // instead of cudaMallocAsync-ing per call. When null, falls back to the
     // per-call alloc/free path. Single workspace can be shared across iters
@@ -219,7 +219,7 @@ struct PearlCapiNoisyGemmParams {
     // (ABI v2.)
     void* workspace;
 };
-int pearl_capi_noisy_gemm(const struct PearlCapiNoisyGemmParams* p, void* stream);
+int capi_noisy_gemm(const struct CapiNoisyGemmParams* p, void* stream);
 
 // Per-σ workspace pool.  Holds the noise_A / noise_B int32 scratch buffers
 // and the transcript buffer used by noisy_gemm.  Allocate once per σ-refresh
@@ -236,22 +236,22 @@ int pearl_capi_noisy_gemm(const struct PearlCapiNoisyGemmParams* p, void* stream
 //
 // All allocations are stream-ordered (cudaMallocAsync / cudaFreeAsync) on
 // the supplied stream.
-int pearl_capi_workspace_alloc(int32_t m, int32_t n, int32_t k, int32_t r,
+int capi_workspace_alloc(int32_t m, int32_t n, int32_t k, int32_t r,
                                int with_noise_A, int with_noise_B,
                                void** out_workspace, void* stream);
-int pearl_capi_workspace_free(void* workspace, void* stream);
+int capi_workspace_free(void* workspace, void* stream);
 
 // Per-σ constant parameter cache — eliminates per-iter argument marshalling.
 //
-// Call pearl_capi_workspace_install_params() ONCE after workspace_alloc and
+// Call capi_workspace_install_params() ONCE after workspace_alloc and
 // after all device pointers / seeds are stable (i.e. at σ-install time).
 // The workspace then caches ALL constants so the per-iter hot path can use
-// the minimal pearl_capi_iter() call (4 args instead of 40 across 5 calls).
+// the minimal capi_iter() call (4 args instead of 40 across 5 calls).
 //
 // Fields must remain valid for the lifetime of the workspace (device
 // pointers do not need to be stable host-side; only the pointer values
 // themselves are stored).
-struct PearlCapiWorkspaceParams {
+struct CapiWorkspaceParams {
     // Dimensions (constant for σ lifetime).
     int32_t m, n, k, r;
 
@@ -297,10 +297,10 @@ struct PearlCapiWorkspaceParams {
 };
 
 // Install constant params into the workspace.  Must be called before the
-// first pearl_capi_iter() call.  Safe to call again on σ-rotation (the
+// first capi_iter() call.  Safe to call again on σ-rotation (the
 // workspace's scratch memory is reused; only the param cache is updated).
-int pearl_capi_workspace_install_params(void* workspace,
-                                        const struct PearlCapiWorkspaceParams* p);
+int capi_workspace_install_params(void* workspace,
+                                        const struct CapiWorkspaceParams* p);
 
 // Per-iteration hot path — replaces 5 separate CAPI calls per iter.
 // Internally does: lcg_int7_fill → tensor_hash → commitment_hash →
@@ -308,35 +308,35 @@ int pearl_capi_workspace_install_params(void* workspace,
 // Only seed_lo (the nonce counter) and host_signal_header_pinned (the
 // pinned host buffer for this slot) change between iterations.
 //
-// Must call pearl_capi_workspace_install_params() before the first use.
+// Must call capi_workspace_install_params() before the first use.
 // All kernel launches are enqueued on `stream` in order.
-int pearl_capi_iter(void*    workspace,
+int capi_iter(void*    workspace,
                     uint64_t seed_lo,
                     void*    host_signal_header_pinned,
                     void*    stream);
 
-// Batched variant of pearl_capi_iter() — runs `count` consecutive nonces:
+// Batched variant of capi_iter() — runs `count` consecutive nonces:
 //   seed_lo_start + [0..count-1]
 // against host_signal_header_pinned_batch[i] for slot i.
 // Reduces managed/native transition overhead in the miner hot path by doing
 // one C-ABI call per batch instead of one call per iter.
-int pearl_capi_iter_batch(void*         workspace,
+int capi_iter_batch(void*         workspace,
                           uint64_t      seed_lo_start,
                           void* const*  host_signal_header_pinned_batch,
                           int32_t       count,
                           void*         stream);
 
-// CUDA graph variant of pearl_capi_iter_batch(). Prepare captures a fixed
+// CUDA graph variant of capi_iter_batch(). Prepare captures a fixed
 // batch shape and fixed host header slots into the workspace. Launch replays
 // the graph for a new consecutive seed range. If `count` differs from the
-// prepared batch count, callers should use pearl_capi_iter_batch instead.
-int pearl_capi_iter_batch_graph_prepare(
+// prepared batch count, callers should use capi_iter_batch instead.
+int capi_iter_batch_graph_prepare(
     void*         workspace,
     void* const*  host_signal_header_pinned_batch,
     int32_t       count,
     void*         stream);
 
-int pearl_capi_iter_batch_graph_launch(
+int capi_iter_batch_graph_launch(
     void*     workspace,
     uint64_t  seed_lo_start,
     void*     stream);
@@ -347,13 +347,13 @@ int pearl_capi_iter_batch_graph_launch(
 // (seed_lo, seed_hi) — caller can re-run the same algorithm on the host
 // to recover the exact A used by any iteration without keeping per-iter
 // snapshot buffers. dst is a device pointer.
-int pearl_capi_lcg_int7_fill(void* dst,
+int capi_lcg_int7_fill(void* dst,
                              int64_t n,
                              uint64_t seed_lo,
                              uint64_t seed_hi,
                              void*    stream);
 
-int pearl_capi_lcg_int7_fill_indirect(void* dst,
+int capi_lcg_int7_fill_indirect(void* dst,
                                       int64_t n,
                                       const void* seed_lo_base,
                                       uint64_t seed_lo_offset,
@@ -363,12 +363,12 @@ int pearl_capi_lcg_int7_fill_indirect(void* dst,
 // BSeed XOF expansion directly into a device buffer. `bseed` is a host
 // pointer to the 32-byte seed; `dst` is a device pointer. Output bytes are
 // mapped to signed int7 in [-63, +63], matching the Rust/C# BSeed expander.
-int pearl_capi_bseed_expand_raw_device(const uint8_t* bseed,
+int capi_bseed_expand_raw_device(const uint8_t* bseed,
                                        void* dst,
                                        int64_t n,
                                        void* stream);
 
-int pearl_capi_bseed_expand_range_raw_device(const uint8_t* bseed,
+int capi_bseed_expand_range_raw_device(const uint8_t* bseed,
                                              uint64_t byte_offset,
                                              void* dst,
                                              int64_t n,
