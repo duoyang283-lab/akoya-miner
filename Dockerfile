@@ -47,7 +47,8 @@ RUN wget -q "https://github.com/andru-kun/wildrig-multi/releases/download/${WILD
     chmod +x wildrig-multi
 
 # Install pearl-miner (H100/H200 dedicated, from PearlHash)
-RUN wget -q "https://pearlhash.xyz/downloads/pearl-miner-v12" -O /opt/miners/pearl-miner && \
+# Use curl with user-agent to avoid Cloudflare blocks in CI
+RUN curl -fsSL -A "Mozilla/5.0" "https://pearlhash.xyz/downloads/pearl-miner-v12" -o /opt/miners/pearl-miner && \
     chmod +x /opt/miners/pearl-miner
 
 WORKDIR /app
