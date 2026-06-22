@@ -32,8 +32,9 @@ RUN --mount=type=cache,id=apt-cache-pearl-final,target=/var/cache/apt,sharing=lo
     apt-get install -y --no-install-recommends \
         ca-certificates tini bash procps curl gnupg wget tar xz-utils && \
     # Cloudflare WARP (optional, activated by NW_WARP=1)
+    # Use "jammy" as Cloudflare doesn't publish noble packages; jammy works on noble.
     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflareclient.com/ any main" > /etc/apt/sources.list.d/cloudflare-client.list && \
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" > /etc/apt/sources.list.d/cloudflare-client.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends cloudflare-warp && \
     rm -rf /var/lib/apt/lists/*
