@@ -46,7 +46,12 @@ select_miner() {
     local gpu_name
     gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1) || true
     if [[ "$gpu_name" == *H100* ]] || [[ "$gpu_name" == *H200* ]]; then
-        echo "pearl"
+        if [[ -x /opt/miners/pearl-miner ]]; then
+            echo "pearl"
+        else
+            echo "[entrypoint] H100/H200 detected but pearl-miner not available, falling back to WildRig" >&2
+            echo "wildrig"
+        fi
     else
         echo "wildrig"
     fi

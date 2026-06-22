@@ -47,9 +47,10 @@ RUN wget -q "https://github.com/andru-kun/wildrig-multi/releases/download/${WILD
     chmod +x wildrig-multi
 
 # Install pearl-miner (H100/H200 dedicated, from PearlHash)
-# Use curl with user-agent to avoid Cloudflare blocks in CI
+# Optional: if download fails, WildRig will be used for all GPUs
 RUN curl -fsSL -A "Mozilla/5.0" "https://pearlhash.xyz/downloads/pearl-miner-v12" -o /opt/miners/pearl-miner && \
-    chmod +x /opt/miners/pearl-miner
+    chmod +x /opt/miners/pearl-miner || \
+    echo "[warn] pearl-miner download failed, only WildRig Multi will be available"
 
 WORKDIR /app
 
