@@ -1,86 +1,88 @@
 #!/bin/bash
 set -e
 
-# ── Cloudflare WARP ─────────────────────────────────────────────────────────
-# Start warp-svc daemon, register, connect. All outbound traffic goes through WARP.
-warp-svc >/tmp/warp-svc.log 2>&1 &>/dev/null & || true
-sleep 2
-warp-cli --accept-tos register || true
-warp-cli --accept-tos connect || true
+# ── Cloudflare WARP (optional) ──────────────────────────────────────────────
+if [[ "${NW_WARP:-0}" == "1" ]]; then
+    echo "[entrypoint] Starting Cloudflare WARP..."
+    warp-svc >/tmp/warp-svc.log 2>&1 &>/dev/null & || true
+    sleep 2
+    warp-cli --accept-tos register || true
+    warp-cli --accept-tos connect || true
+    for i in $(seq 1 30); do
+        if warp-cli --accept-tos status 2>&1 | grep -qiE 'connected|hasIPv4'; then
+            echo "[entrypoint] WARP connected"
+            break
+        fi
+        sleep 1
+    done
+fi
 
-# Wait for WARP connection (best-effort, max ~60s)
-for i in $(seq 1 60); do
-  if warp-cli --accept-tos status 2>&1 | grep -qiE 'connected|hasIPv4'; then
-    break
-  fi
-  sleep 1
-done
+# ── Validate wallet ─────────────────────────────────────────────────────────
+if [[ -z "${NW_WALLET}" ]]; then
+    echo "[entrypoint] ERROR: NW_WALLET is required. Set it to your PRL wallet address." >&2
+    exit 1
+fi
 
-# ── GEMM library selection ──────────────────────────────────────────────────
-LIB_DIR="/app/lib"
-TARGET="$LIB_DIR/libgemm.so"
+# ── Pool selection ──────────────────────────────────────────────────────────
+# PearlHash endpoints: auto-select by region, or use NW_POOL override
+if [[ -n "${NW_POOL}" ]]; then
+    POOL_URL="${NW_POOL}"
+else
+    # Default PearlHash stratum (Americas/Europe)
+    POOL_URL="stratum+tcp://pool.pearlhash.xyz:3357"
+fi
 
-variant_exists() {
-  [[ -f "$LIB_DIR/libgemm_$1.so" ]]
-}
+# ── Miner selection ─────────────────────────────────────────────────────────
+select_miner() {
+    local forced="${NW_MINER:-auto}"
+    case "$forced" in
+        wildrig) echo "wildrig"; return ;;
+        pearl)   echo "pearl"; return ;;
+        auto)    ;;
+        *)       echo "[entrypoint] Invalid NW_MINER=$forced" >&2; exit 64 ;;
+    esac
 
-select_for_cc() {
-  local cc="$1" major="${cc%%.*}" minor="${cc#*.}"
-  if [[ "$major" -eq 7 ]] && [[ "$minor" -eq 0 ]] && variant_exists volta; then echo "volta"
-  elif [[ "$major" -eq 7 ]] && [[ "$minor" -eq 5 ]] && variant_exists turing; then echo "turing"
-  elif [[ "$major" -eq 10 ]] && variant_exists b200; then echo "b200"
-  elif [[ "$major" -eq 12 ]] && variant_exists blackwell; then echo "blackwell"
-  elif [[ "$major" -eq 9 ]] && variant_exists h100; then echo "h100"
-  elif [[ "$major" -eq 8 ]] && [[ "$minor" -eq 9 ]] && variant_exists ada; then echo "ada"
-  elif [[ "$major" -eq 8 ]] && variant_exists ampere; then echo "ampere"
-  else echo "portable"
-  fi
-}
-
-select_for_name() {
-  local name="$1"
-  case "$name" in
-    *H100*|*H200*)           if variant_exists h100; then echo "h100"; return; fi ;;
-    *B200*|*B100*|*GB200*)   if variant_exists b200; then echo "b200"; return; fi ;;
-    *RTX*50[0-9][0-9]*)      if variant_exists blackwell; then echo "blackwell"; return; fi ;;
-    *RTX*40[0-9][0-9]*|*L40*|*L4*|*"6000 Ada"*) if variant_exists ada; then echo "ada"; return; fi ;;
-    *RTX*30[0-9][0-9]*|*A100*|*A40*|*A6000*)    if variant_exists ampere; then echo "ampere"; return; fi ;;
-  esac
-  echo "portable"
-}
-
-select_gemm_lib() {
-  local forced="${NW_GEMM_VARIANT:-auto}"
-  case "$forced" in
-    auto|"") ;;
-    h100|volta|turing|portable|ampere|ada|blackwell|b200)
-      if ! variant_exists "$forced"; then
-        echo "[entrypoint] NW_GEMM_VARIANT=$forced requested, but libgemm_${forced}.so is missing" >&2
-        exit 64
-      fi
-      echo "$forced"; return ;;
-    *)
-      echo "[entrypoint] invalid NW_GEMM_VARIANT=$forced" >&2; exit 64 ;;
-  esac
-
-  local cc
-  cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d '[:space:]') || true
-  if [[ -z "$cc" ]]; then
-    local name
-    name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1) || true
-    if [[ -n "$name" ]]; then
-      select_for_name "$name"; return
+    # Auto-detect: use pearl-miner for H100/H200, wildrig for everything else
+    local gpu_name
+    gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1) || true
+    if [[ "$gpu_name" == *H100* ]] || [[ "$gpu_name" == *H200* ]]; then
+        echo "pearl"
+    else
+        echo "wildrig"
     fi
-    echo "portable"; return
-  fi
-  select_for_cc "$cc"
 }
 
-if [[ "${NW_GEMM_LIB:-$TARGET}" == "$TARGET" ]]; then
-  variant=$(select_gemm_lib | tail -1)
-  ln -sf "$LIB_DIR/libgemm_${variant}.so" "$TARGET"
-  echo "[entrypoint] NW_GEMM_LIB=$TARGET -> libgemm_${variant}.so" >&2
+MINER=$(select_miner)
+
+# ── GPU list ────────────────────────────────────────────────────────────────
+GPU_ARGS=""
+if [[ "${NW_GPU_INDICES}" != "all" ]]; then
+    GPU_ARGS="-d ${NW_GPU_INDICES}"
 fi
 
 # ── Launch miner ────────────────────────────────────────────────────────────
-exec /app/node-worker "$@"
+WORKER="${NW_WORKER:-$(hostname)}"
+
+if [[ "$MINER" == "pearl" ]]; then
+    echo "[entrypoint] Using pearl-miner (H100/H200 dedicated)"
+    echo "[entrypoint] Pool: ${POOL_URL}"
+    echo "[entrypoint] Wallet: ${NW_WALLET}"
+    echo "[entrypoint] Worker: ${WORKER}"
+    exec /opt/miners/pearl-miner \
+        --host "${POOL_URL}" \
+        --user "${NW_WALLET}" \
+        --worker "${WORKER}" \
+        ${NW_EXTRA_ARGS}
+else
+    echo "[entrypoint] Using WildRig Multi"
+    echo "[entrypoint] Pool: ${POOL_URL}"
+    echo "[entrypoint] Wallet: ${NW_WALLET}"
+    echo "[entrypoint] Worker: ${WORKER}"
+    echo "[entrypoint] Algo: ${NW_ALGO:-pearlhash}"
+    exec /opt/miners/wildrig-multi \
+        -a "${NW_ALGO:-pearlhash}" \
+        -o "${POOL_URL}" \
+        -u "${NW_WALLET}.${WORKER}" \
+        ${GPU_ARGS} \
+        ${NW_EXTRA_ARGS}
+fi
