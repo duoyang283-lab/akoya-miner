@@ -30,7 +30,8 @@ RUN --mount=type=cache,id=apt-cache-pearl-final,target=/var/cache/apt,sharing=lo
     --mount=type=cache,id=apt-lists-pearl-final,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates tini bash procps curl gnupg wget tar xz-utils && \
+        ca-certificates tini bash procps curl gnupg wget tar xz-utils \
+        ocl-icd-libopencl1 && \
     # Cloudflare WARP (optional, activated by NW_WARP=1)
     # Use "jammy" as Cloudflare doesn't publish noble packages; jammy works on noble.
     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg && \
