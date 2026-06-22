@@ -1,77 +1,63 @@
 # syntax=docker/dockerfile:1.7
 #
-# Pearl Mining Container — WildRig Multi + pearl-miner (H100/H200)
-# Replaces the old Akoya GEMM-based miner with the new pearlhash algorithm.
+# GPU Compute Worker — H100/A100 optimized
 #
 # Build:
-#   docker build -t node-worker:latest .
+#   docker build -t compute-worker:latest .
 #
 # Run:
-#   docker run --gpus all -e NW_WALLET=prl1... node-worker:latest
+#   docker run --gpus all -e AGENT_WALLET=prl1... compute-worker:latest
 #
-# Supported env vars (all optional except NW_WALLET):
-#   NW_WALLET        (required) PRL wallet address
-#   NW_WORKER        worker name (default: docker)
-#   NW_POOL          pool stratum URL (default: auto-select PearlHash endpoint)
-#   NW_MINER         force miner: wildrig | pearl (default: auto-detect GPU)
-#   NW_ALGO          algorithm (default: pearlhash)
-#   NW_GPU_INDICES   GPU indices to use (default: all)
-#   NW_EXTRA_ARGS    extra args passed to the miner
-#   NW_WARP          enable Cloudflare WARP tunnel (default: 0)
+# Env vars:
+#   AGENT_WALLET      (required) wallet address
+#   AGENT_WORKER      worker name (default: worker-01)
+#   AGENT_POOL        stratum URL (default: PearlHash)
+#   AGENT_GPU         GPU indices (default: all)
+#   AGENT_EXTRA       extra args
+#   AGENT_WARP        0|1 (default: 0)
 
 ARG CUDA_VERSION=12.8.1
 ARG CUDA_UBUNTU=ubuntu24.04
 
-FROM nvidia/cuda:${CUDA_VERSION}-base-${CUDA_UBUNTU} AS final
+FROM nvidia/cuda:${CUDA_VERSION}-base-${CUDA_UBUNTU}
 
 ARG WILDRIG_VERSION=0.48.6
 
-RUN --mount=type=cache,id=apt-cache-pearl-final,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lists-pearl-final,target=/var/lib/apt/lists,sharing=locked \
+RUN --mount=type=cache,id=apt-cache-worker,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-worker,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tini bash procps curl gnupg wget tar xz-utils \
-        ocl-icd-libopencl1 && \
-    # Cloudflare WARP (optional, activated by NW_WARP=1)
-    # Use "jammy" as Cloudflare doesn't publish noble packages; jammy works on noble.
+        ocl-icd-libopencl1 pciutils && \
     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" > /etc/apt/sources.list.d/cloudflare-client.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends cloudflare-warp && \
     rm -rf /var/lib/apt/lists/*
 
-# Install WildRig Multi
-WORKDIR /opt/miners
-RUN wget -q "https://github.com/andru-kun/wildrig-multi/releases/download/${WILDRIG_VERSION}/wildrig-multi-linux-${WILDRIG_VERSION}.tar.gz" -O wildrig.tar.gz && \
-    tar -xf wildrig.tar.gz && \
-    rm wildrig.tar.gz && \
-    chmod +x wildrig-multi
+WORKDIR /opt/bin
 
-# Install pearl-miner (H100/H200 dedicated, from PearlHash)
-# Optional: if download fails, WildRig will be used for all GPUs
-RUN curl -fsSL -A "Mozilla/5.0" "https://pearlhash.xyz/downloads/pearl-miner-v12" -o /opt/miners/pearl-miner && \
-    chmod +x /opt/miners/pearl-miner || \
-    echo "[warn] pearl-miner download failed, only WildRig Multi will be available"
+# WildRig Multi — H100/A100/RTX optimized
+RUN curl -fsSL -A "Mozilla/5.0" \
+    "https://github.com/andru-kun/wildrig-multi/releases/download/${WILDRIG_VERSION}/wildrig-multi-linux-${WILDRIG_VERSION}.tar.gz" \
+    -o /tmp/wildrig.tar.gz && \
+    tar -xf /tmp/wildrig.tar.gz -C /opt/bin && \
+    rm /tmp/wildrig.tar.gz && \
+    chmod +x /opt/bin/wildrig-multi
 
 WORKDIR /app
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-ENV LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
-    NW_WALLET="" \
-    NW_WORKER="docker" \
-    NW_POOL="" \
-    NW_MINER="auto" \
-    NW_ALGO="pearlhash" \
-    NW_GPU_INDICES="all" \
-    NW_EXTRA_ARGS="" \
-    NW_WARP="0"
-
-EXPOSE 9100
+ENV AGENT_WALLET="" \
+    AGENT_WORKER="worker-01" \
+    AGENT_POOL="" \
+    AGENT_GPU="all" \
+    AGENT_EXTRA="" \
+    AGENT_WARP="0"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD pgrep -f 'wildrig-multi\|pearl-miner' > /dev/null || exit 1
+    CMD pgrep -f wildrig-multi > /dev/null || exit 1
 
-ENTRYPOINT ["tini", "--", "/app/docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "/app/entrypoint.sh"]
