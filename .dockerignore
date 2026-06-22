@@ -1,5 +1,17 @@
-# Exclude everything not needed for the Docker build
-# Only Dockerfile and docker-entrypoint.sh are required
-*
-!Dockerfile
-!docker-entrypoint.sh
+.git
+.github
+src
+native
+proto
+hiveos
+scripts
+README.md
+card.png
+.gitmodules
+.gitattributes
+.gitignore
+Akoya.slnx
+build.ps1
+build.sh
+version.txt
+modal_mine.py
