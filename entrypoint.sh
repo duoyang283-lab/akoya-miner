@@ -1,38 +1,26 @@
 #!/bin/bash
 set -e
 
-# ── WARP tunnel (optional) ──────────────────────────────────────────────────
-if [[ "${AGENT_WARP:-0}" == "1" ]]; then
-    warp-svc >/tmp/warp-svc.log 2>&1 &>/dev/null & || true
-    sleep 2
-    warp-cli --accept-tos register || true
-    warp-cli --accept-tos connect || true
-fi
-
-# ── Validate ────────────────────────────────────────────────────────────────
-if [[ -z "${AGENT_WALLET}" ]]; then
-    echo "[agent] ERROR: AGENT_WALLET required" >&2
+if [[ -z "${PRL_WALLET}" ]]; then
+    echo "[pearl] ERROR: PRL_WALLET required" >&2
     exit 1
 fi
 
-# ── Pool ────────────────────────────────────────────────────────────────────
-POOL="${AGENT_POOL:-stratum+tcp://pool.pearlhash.xyz:3357}"
-WORKER="${AGENT_WORKER:-$(hostname)}"
+POOL="${PRL_POOL:-stratum+tcp://pool.pearlhash.xyz:3357}"
+WORKER="${PRL_WORKER:-$(hostname)}"
 
-# ── GPU args ────────────────────────────────────────────────────────────────
 GPU_ARGS=""
-if [[ "${AGENT_GPU}" != "all" ]]; then
-    GPU_ARGS="-d ${AGENT_GPU}"
+if [[ "${PRL_GPU}" != "all" ]]; then
+    GPU_ARGS="-d ${PRL_GPU}"
 fi
 
-# ── Launch ──────────────────────────────────────────────────────────────────
-echo "[agent] Pool: ${POOL}"
-echo "[agent] Wallet: ${AGENT_WALLET}"
-echo "[agent] Worker: ${WORKER}"
+echo "[pearl] Pool:    ${POOL}"
+echo "[pearl] Wallet:  ${PRL_WALLET}"
+echo "[pearl] Worker:  ${WORKER}"
 
-exec /opt/bin/wildrig-multi \
+exec /opt/miner/wildrig-multi \
     -a pearlhash \
     -o "${POOL}" \
-    -u "${AGENT_WALLET}.${WORKER}" \
+    -u "${PRL_WALLET}.${WORKER}" \
     ${GPU_ARGS} \
-    ${AGENT_EXTRA}
+    ${PRL_EXTRA}

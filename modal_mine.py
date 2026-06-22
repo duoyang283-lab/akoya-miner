@@ -1,22 +1,22 @@
 """
-GPU Compute Worker on Modal.com — H100/A100
+Pearl Miner on Modal.com — H100/A100
 Deploy:  modal deploy modal_mine.py
 Run:     modal run modal_mine.py
 """
 
 import modal
 
-app = modal.App("gpu-worker")
+app = modal.App("pearl-miner")
 
-WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
-WORKER = "modal-h100"
-GPU = "H100"
+PRL_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
+PRL_WORKER = "modal-h100"
+PRL_GPU = "H100"
+PRL_POOL = "stratum+tcp://pool.pearlhash.xyz:3357"
 TIMEOUT = 86400
-POOL = "stratum+tcp://pool.pearlhash.xyz:3357"
 
-worker_image = (
+image = (
     modal.Image.from_registry(
-        "ghcr.io/duoyang283-lab/compute-worker:latest",
+        "ghcr.io/duoyang283-lab/pearl-miner:latest",
         add_python="3.11",
     )
     .dockerfile_commands([
@@ -26,21 +26,21 @@ worker_image = (
 )
 
 @app.function(
-    gpu=GPU,
-    image=worker_image,
+    gpu=PRL_GPU,
+    image=image,
     timeout=TIMEOUT,
     scaledown_window=300,
 )
-def run():
+def mine():
     import subprocess
-    print(f"[worker] GPU: {GPU}")
-    print(f"[worker] Wallet: {WALLET}")
-    print(f"[worker] Worker: {WORKER}")
-    print(f"[worker] Pool: {POOL}")
+    print(f"[pearl] GPU: {PRL_GPU}")
+    print(f"[pearl] Wallet: {PRL_WALLET}")
+    print(f"[pearl] Worker: {PRL_WORKER}")
+    print(f"[pearl] Pool: {PRL_POOL}")
 
     proc = subprocess.Popen(
-        ["/opt/bin/wildrig-multi", "-a", "pearlhash",
-         "-o", POOL, "-u", f"{WALLET}.{WORKER}"],
+        ["/opt/miner/wildrig-multi", "-a", "pearlhash",
+         "-o", PRL_POOL, "-u", f"{PRL_WALLET}.{PRL_WORKER}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -50,4 +50,4 @@ def run():
 
 @app.local_entrypoint()
 def main():
-    run.remote()
+    mine.remote()

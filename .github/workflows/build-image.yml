@@ -1,4 +1,4 @@
-name: Build Compute Worker Image
+name: Build Pearl Miner Image
 on:
   workflow_dispatch:
     inputs:
@@ -37,7 +37,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/compute-worker:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ github.repository_owner }}/pearl-miner:${{ env.IMAGE_TAG }}
 
       - name: Done
-        run: echo "Pushed ghcr.io/${{ github.repository_owner }}/compute-worker:${{ env.IMAGE_TAG }}"
+        run: echo "Pushed ghcr.io/${{ github.repository_owner }}/pearl-miner:${{ env.IMAGE_TAG }}"
