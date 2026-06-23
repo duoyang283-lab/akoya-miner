@@ -17,10 +17,7 @@ image = (
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
     )
     .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
-    .run_commands(
-        "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
-        "cd /opt/pearl/py-pearl-mining && python -m venv .venv && . .venv/bin/activate && pip install maturin && maturin develop --release",
-    )
+    .pip_install("git+https://github.com/pearl-research-labs/pearl#subdirectory=py-pearl-mining")
 )
 
 @app.function(
@@ -39,11 +36,6 @@ def run():
         capture_output=True, text=True, timeout=10
     )
     print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
-
-    # Add venv to path
-    venv_path = "/opt/pearl/py-pearl-mining/.venv/lib/python3.12/site-packages"
-    if venv_path not in sys.path:
-        sys.path.insert(0, venv_path)
 
     # Try import
     try:
