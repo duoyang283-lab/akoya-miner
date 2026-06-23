@@ -16,7 +16,7 @@ TIMEOUT = 86400
 
 image = (
     modal.Image.from_registry(
-        "ghcr.io/duoyang283-lab/pearl-miner:latest",
+        "ghcr.io/duoyang283-lab/node-worker:latest",
         add_python="3.11",
     )
     .dockerfile_commands([
