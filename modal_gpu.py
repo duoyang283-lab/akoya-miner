@@ -19,7 +19,7 @@ image = (
     .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
     .run_commands(
         "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
-        "cd /opt/pearl/py-pearl-mining && python -m venv .venv && source .venv/bin/activate && pip install maturin && maturin develop --release",
+        "cd /opt/pearl/py-pearl-mining && python -m venv .venv && . .venv/bin/activate && pip install maturin && maturin develop --release",
     )
 )
 
