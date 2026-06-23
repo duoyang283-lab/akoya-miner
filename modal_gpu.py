@@ -34,31 +34,34 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import pearl_mining as pm
-    import time
-
-    # Check GPU
-    print("[debug] Checking GPU...")
+    import sys
+    sys.stdout.flush()
+    
+    print("[debug] Starting...", flush=True)
+    
     import subprocess
     nvidia_smi = subprocess.run(
         ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader"],
         capture_output=True, text=True, timeout=10
     )
-    print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
-
-    # Create test block header
-    print("[debug] Creating test block header...")
+    print(f"[debug] GPU: {nvidia_smi.stdout.strip()}", flush=True)
+    
+    print("[debug] Importing pearl_mining...", flush=True)
+    import pearl_mining as pm
+    print(f"[debug] pearl_mining version: {pm.__version__}", flush=True)
+    
+    print("[debug] Creating block header...", flush=True)
     header = pm.IncompleteBlockHeader(
         version=1,
         prev_block=bytes(32),
         merkle_root=bytes(32),
         timestamp=0,
-        nbits=0x207FFFFF,  # easiest difficulty
+        nbits=0x207FFFFF,
     )
-
-    # Create mining config
-    print("[debug] Creating mining config...")
-    k = 1024  # common dimension
+    print("[debug] Header created", flush=True)
+    
+    print("[debug] Creating mining config...", flush=True)
+    k = 1024
     rank = 32
     rows_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
     cols_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
@@ -70,24 +73,25 @@ def run():
         cols_pattern=cols_pattern,
         moe=None,
     )
-
-    # Test mining
-    print("[debug] Starting mining test...")
+    print("[debug] Config created", flush=True)
+    
+    print("[debug] Starting mine()...", flush=True)
     m, n = 128, 128
+    import time
     start = time.time()
     
     try:
         proof = pm.mine(m, n, k, header, mining_config)
         elapsed = time.time() - start
-        print(f"[debug] Mining completed in {elapsed:.2f}s")
-        print(f"[debug] Proof type: {type(proof)}")
-        print(f"[debug] Proof: {proof}")
+        print(f"[debug] Mining done in {elapsed:.2f}s", flush=True)
+        print(f"[debug] Proof: {proof}", flush=True)
     except Exception as e:
-        print(f"[debug] Mining failed: {e}")
+        print(f"[debug] Error: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return 1
-
+    
+    print("[debug] Done!", flush=True)
     return 0
 
 @app.local_entrypoint()
