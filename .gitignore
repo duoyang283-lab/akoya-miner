@@ -26,3 +26,5 @@ target/
 
 # CUTLASS is a git submodule (see .gitmodules). The gitlink is committed so that
 # `git clone --recurse-submodules` fetches it; its working-tree files are not vendored.
+venv/
+__pycache__/
