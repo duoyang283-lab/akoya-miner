@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — Test mine function
+Pearl Mining on Modal.com — Continuous Mining
 Run:     modal run modal_gpu.py
 """
 
@@ -34,35 +34,15 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import sys
-    sys.stdout.flush()
-    
-    print("[debug] Starting...", flush=True)
-    
-    import subprocess
-    nvidia_smi = subprocess.run(
-        ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader"],
-        capture_output=True, text=True, timeout=10
-    )
-    print(f"[debug] GPU: {nvidia_smi.stdout.strip()}", flush=True)
-    
-    print("[debug] Importing pearl_mining...", flush=True)
     import pearl_mining as pm
-    print(f"[debug] pearl_mining version: {pm.__version__}", flush=True)
+    import time, hashlib, struct
+
+    print("[miner] Starting Pearl mining on H100...", flush=True)
     
-    print("[debug] Creating block header...", flush=True)
-    header = pm.IncompleteBlockHeader(
-        version=1,
-        prev_block=bytes(32),
-        merkle_root=bytes(32),
-        timestamp=0,
-        nbits=0x207FFFFF,
-    )
-    print("[debug] Header created", flush=True)
-    
-    print("[debug] Creating mining config...", flush=True)
+    # Mining config
     k = 1024
     rank = 32
+    m, n = 128, 128
     rows_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
     cols_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
     mining_config = pm.MiningConfiguration(
@@ -73,25 +53,35 @@ def run():
         cols_pattern=cols_pattern,
         moe=None,
     )
-    print("[debug] Config created", flush=True)
     
-    print("[debug] Starting mine()...", flush=True)
-    m, n = 128, 128
-    import time
+    count = 0
     start = time.time()
     
-    try:
+    while True:
+        # Generate unique block header each iteration
+        timestamp = int(time.time())
+        nonce = struct.pack('<Q', count)
+        prev_hash = hashlib.sha256(nonce).digest()
+        merkle_root = hashlib.sha256(prev_hash + nonce).digest()
+        
+        header = pm.IncompleteBlockHeader(
+            version=1,
+            prev_block=prev_hash,
+            merkle_root=merkle_root,
+            timestamp=timestamp,
+            nbits=0x207FFFFF,
+        )
+        
+        # Mine
         proof = pm.mine(m, n, k, header, mining_config)
-        elapsed = time.time() - start
-        print(f"[debug] Mining done in {elapsed:.2f}s", flush=True)
-        print(f"[debug] Proof: {proof}", flush=True)
-    except Exception as e:
-        print(f"[debug] Error: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        return 1
+        count += 1
+        
+        # Stats every 100 proofs
+        if count % 100 == 0:
+            elapsed = time.time() - start
+            rate = count / elapsed
+            print(f"[miner] Proofs: {count} | Rate: {rate:.1f}/s | Time: {elapsed:.1f}s", flush=True)
     
-    print("[debug] Done!", flush=True)
     return 0
 
 @app.local_entrypoint()
