@@ -17,7 +17,14 @@ image = (
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
     )
     .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
-    .pip_install("git+https://github.com/pearl-research-labs/pearl#subdirectory=py-pearl-mining")
+    .run_commands(
+        "pip install maturin",
+        "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
+        "cd /opt/pearl/py-pearl-mining && maturin build --release",
+    )
+    .run_commands(
+        "cd /opt/pearl/py-pearl-mining && pip install target/wheels/*.whl",
+    )
 )
 
 @app.function(
@@ -27,7 +34,7 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import subprocess, os, sys
+    import subprocess
 
     # Check GPU
     print("[debug] Checking GPU...")
