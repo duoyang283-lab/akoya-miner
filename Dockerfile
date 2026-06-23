@@ -24,7 +24,10 @@ RUN --mount=type=cache,id=apt-cache-prl,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tini bash procps curl gnupg wget tar xz-utils \
-        ocl-icd-libopencl1 pciutils nvidia-opencl-icd && \
+        ocl-icd-libopencl1 pciutils && \
+    # Create NVIDIA OpenCL ICD file manually
+    mkdir -p /etc/OpenCL/vendors && \
+    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/miner
