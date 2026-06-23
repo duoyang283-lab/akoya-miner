@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — py-pearl-mining
+Pearl Mining on Modal.com — Test mine function
 Run:     modal run modal_gpu.py
 """
 
@@ -34,23 +34,58 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import subprocess
+    import pearl_mining as pm
+    import time
 
     # Check GPU
     print("[debug] Checking GPU...")
+    import subprocess
     nvidia_smi = subprocess.run(
         ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader"],
         capture_output=True, text=True, timeout=10
     )
     print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
 
-    # Try import
+    # Create test block header
+    print("[debug] Creating test block header...")
+    header = pm.IncompleteBlockHeader(
+        version=1,
+        prev_block=bytes(32),
+        merkle_root=bytes(32),
+        timestamp=0,
+        nbits=0x207FFFFF,  # easiest difficulty
+    )
+
+    # Create mining config
+    print("[debug] Creating mining config...")
+    k = 1024  # common dimension
+    rank = 32
+    rows_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
+    cols_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
+    mining_config = pm.MiningConfiguration(
+        common_dim=k,
+        rank=rank,
+        mma_type=pm.MMAType.Int7xInt7ToInt32,
+        rows_pattern=rows_pattern,
+        cols_pattern=cols_pattern,
+        moe=None,
+    )
+
+    # Test mining
+    print("[debug] Starting mining test...")
+    m, n = 128, 128
+    start = time.time()
+    
     try:
-        import pearl_mining
-        print(f"[debug] pearl_mining imported successfully!")
-        print(f"[debug] dir: {dir(pearl_mining)}")
-    except ImportError as e:
-        print(f"[debug] Import failed: {e}")
+        proof = pm.mine(m, n, k, header, mining_config)
+        elapsed = time.time() - start
+        print(f"[debug] Mining completed in {elapsed:.2f}s")
+        print(f"[debug] Proof type: {type(proof)}")
+        print(f"[debug] Proof: {proof}")
+    except Exception as e:
+        print(f"[debug] Mining failed: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
     return 0
