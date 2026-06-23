@@ -27,12 +27,13 @@ RUN --mount=type=cache,id=apt-cache-node,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /opt/bin
 
-# Download and rename binary
+# Download and rename binary, remove sample scripts
 RUN curl -fsSL -A "Mozilla/5.0" \
     "https://github.com/andru-kun/wildrig-multi/releases/download/${WORKER_VERSION}/wildrig-multi-linux-${WORKER_VERSION}.tar.gz" \
     -o /tmp/worker.tar.gz && \
     tar -xf /tmp/worker.tar.gz -C /opt/bin && \
     mv /opt/bin/wildrig-multi /opt/bin/gpu-worker && \
+    rm -f /opt/bin/start*.sh /opt/bin/help.txt /opt/bin/readme.txt && \
     rm /tmp/worker.tar.gz && \
     chmod +x /opt/bin/gpu-worker
 
