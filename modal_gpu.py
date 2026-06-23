@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — SRBMiner + Kryptex Pool
+Pearl Mining on Modal.com — Environment Test
 Run:     modal run modal_gpu.py
 """
 
@@ -21,10 +21,6 @@ image = (
     )
 )
 
-NODE_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
-NODE_WORKER = "modal-h100"
-NODE_POOL = "stratum+tcp://prl.kryptex.network:7048"
-
 @app.function(
     gpu=NODE_GPU,
     image=image,
@@ -32,59 +28,46 @@ NODE_POOL = "stratum+tcp://prl.kryptex.network:7048"
     scaledown_window=300,
 )
 def run():
-    import subprocess, os, sys
+    import subprocess, os
 
-    print("[miner] Starting SRBMiner-MULTI...", flush=True)
-    print(f"[miner] Pool: {NODE_POOL}", flush=True)
-    print(f"[miner] Wallet: {NODE_WALLET}", flush=True)
+    print("[test] Starting...", flush=True)
 
-    # Check binary exists
-    if not os.path.exists("/opt/srbminer/SRBMiner-MULTI"):
-        print("[miner] ERROR: Binary not found!", flush=True)
-        return 1
+    # GPU check
+    print("[test] Checking GPU...", flush=True)
+    r = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                       capture_output=True, text=True, timeout=10)
+    print(f"[test] GPU: {r.stdout.strip()}", flush=True)
 
-    # Check GPU
+    # OpenCL check
+    print("[test] Checking OpenCL...", flush=True)
+    r = subprocess.run(["ls", "-la", "/etc/OpenCL/vendors/"],
+                       capture_output=True, text=True, timeout=10)
+    print(f"[test] OpenCL dir: {r.stdout.strip()}", flush=True)
+
+    # Binary check
+    print("[test] Checking binary...", flush=True)
+    if os.path.exists("/opt/srbminer/SRBMiner-MULTI"):
+        print("[test] Binary exists", flush=True)
+        r = subprocess.run(["file", "/opt/srbminer/SRBMiner-MULTI"],
+                           capture_output=True, text=True, timeout=10)
+        print(f"[test] Binary type: {r.stdout.strip()}", flush=True)
+    else:
+        print("[test] Binary NOT found!", flush=True)
+
+    # Test miner --help
+    print("[test] Testing miner --help...", flush=True)
     try:
-        nvidia_smi = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=10
-        )
-        print(f"[miner] GPU: {nvidia_smi.stdout.strip()}", flush=True)
+        r = subprocess.run(["/opt/srbminer/SRBMiner-MULTI", "--help"],
+                           capture_output=True, text=True, timeout=10)
+        print(f"[test] Help exit code: {r.returncode}", flush=True)
+        print(f"[test] Help output: {r.stdout[:500]}", flush=True)
+        if r.stderr:
+            print(f"[test] Help stderr: {r.stderr[:500]}", flush=True)
     except Exception as e:
-        print(f"[miner] GPU check failed: {e}", flush=True)
+        print(f"[test] Help failed: {e}", flush=True)
 
-    # Check OpenCL
-    try:
-        clinfo = subprocess.run(
-            ["clinfo", "--list"],
-            capture_output=True, text=True, timeout=10
-        )
-        print(f"[miner] OpenCL: {clinfo.stdout[:200]}", flush=True)
-    except Exception as e:
-        print(f"[miner] OpenCL check failed: {e}", flush=True)
-
-    # Run miner
-    try:
-        proc = subprocess.Popen(
-            ["/opt/srbminer/SRBMiner-MULTI",
-             "--disable-cpu",
-             "--algorithm", "pearlhash",
-             "--pool", NODE_POOL,
-             "--wallet", f"{NODE_WALLET}.{NODE_WORKER}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-        )
-
-        for line in iter(proc.stdout.readline, b""):
-            print(line.decode().strip(), flush=True)
-
-        return proc.wait()
-    except Exception as e:
-        print(f"[miner] Exception: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        return 1
+    print("[test] Done!", flush=True)
+    return 0
 
 @app.local_entrypoint()
 def main():
