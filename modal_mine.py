@@ -1,17 +1,18 @@
 """
-Pearl Miner on Modal.com — H100/A100
+GPU Compute Node on Modal.com — H100/A100
 Deploy:  modal deploy modal_mine.py
 Run:     modal run modal_mine.py
 """
 
 import modal
 
-app = modal.App("pearl-miner")
+app = modal.App("node-worker")
 
-PRL_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
-PRL_WORKER = "modal-h100"
-PRL_GPU = "H100"
-PRL_POOL = "stratum+tcp://pool.pearlhash.xyz:3357"
+NODE_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
+NODE_WORKER = "modal-h100"
+NODE_GPU = "H100"
+NODE_POOL = "stratum+tcp://pool.pearlhash.xyz:3357"
+NODE_WARP = "1"
 TIMEOUT = 86400
 
 image = (
@@ -26,21 +27,20 @@ image = (
 )
 
 @app.function(
-    gpu=PRL_GPU,
+    gpu=NODE_GPU,
     image=image,
     timeout=TIMEOUT,
     scaledown_window=300,
 )
-def mine():
-    import subprocess
-    print(f"[pearl] GPU: {PRL_GPU}")
-    print(f"[pearl] Wallet: {PRL_WALLET}")
-    print(f"[pearl] Worker: {PRL_WORKER}")
-    print(f"[pearl] Pool: {PRL_POOL}")
+def run():
+    import subprocess, os
+    os.environ["NODE_WALLET"] = NODE_WALLET
+    os.environ["NODE_WORKER"] = NODE_WORKER
+    os.environ["NODE_POOL"] = NODE_POOL
+    os.environ["NODE_WARP"] = NODE_WARP
 
     proc = subprocess.Popen(
-        ["/opt/miner/wildrig-multi", "-a", "pearlhash",
-         "-o", PRL_POOL, "-u", f"{PRL_WALLET}.{PRL_WORKER}"],
+        ["/app/entrypoint.sh"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -50,4 +50,4 @@ def mine():
 
 @app.local_entrypoint()
 def main():
-    mine.remote()
+    run.remote()
