@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — py-pearl-mining
+Pearl Mining on Modal.com — Debug Build
 Run:     modal run modal_gpu.py
 """
 
@@ -10,17 +10,15 @@ app = modal.App("node-worker")
 NODE_GPU = "H100"
 TIMEOUT = 86400
 
-# Build from official Pearl repo
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
     .apt_install("git", "curl", "wget", "build-essential", "pkg-config", "libssl-dev")
     .run_commands(
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
-        "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
     )
+    .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
     .run_commands(
-        "cd /opt/pearl && pip install maturin && cd py-pearl-mining && maturin develop --release",
-        gpu="H100",
+        "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
     )
 )
 
@@ -31,7 +29,7 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import subprocess
+    import subprocess, os
 
     # Check GPU
     print("[debug] Checking GPU...")
@@ -41,20 +39,50 @@ def run():
     )
     print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
 
-    # Test py-pearl-mining
-    print("[debug] Testing py-pearl-mining...")
-    try:
-        import pearl_mining
-        print(f"[debug] pearl_mining version: {pearl_mining.__version__}")
-        print(f"[debug] Available functions: {dir(pearl_mining)}")
-    except ImportError as e:
-        print(f"[debug] Import error: {e}")
+    # Check if repo exists
+    print("[debug] Checking /opt/pearl...")
+    if os.path.exists("/opt/pearl"):
+        print(f"[debug] /opt/pearl exists, contents: {os.listdir('/opt/pearl')[:10]}")
+    else:
+        print("[debug] /opt/pearl does not exist!")
         return 1
 
-    # Run mining
-    print("[debug] Starting mining...")
-    # TODO: Add actual mining logic based on pearl_mining API
-    print("[debug] Mining module loaded successfully!")
+    # Check py-pearl-mining
+    py_mining_path = "/opt/pearl/py-pearl-mining"
+    if os.path.exists(py_mining_path):
+        print(f"[debug] {py_mining_path} exists")
+        print(f"[debug] Contents: {os.listdir(py_mining_path)}")
+    else:
+        print(f"[debug] {py_mining_path} does not exist!")
+        return 1
+
+    # Try to build
+    print("[debug] Building py-pearl-mining...")
+    result = subprocess.run(
+        ["pip", "install", "maturin"],
+        capture_output=True, text=True, timeout=60
+    )
+    print(f"[debug] maturin install: {result.returncode}")
+
+    result = subprocess.run(
+        ["maturin", "develop", "--release"],
+        cwd=py_mining_path,
+        capture_output=True, text=True, timeout=300
+    )
+    print(f"[debug] maturin build: {result.returncode}")
+    if result.stdout:
+        print(f"[debug] stdout: {result.stdout[:500]}")
+    if result.stderr:
+        print(f"[debug] stderr: {result.stderr[:500]}")
+
+    # Try import
+    try:
+        import pearl_mining
+        print(f"[debug] pearl_mining imported successfully!")
+        print(f"[debug] dir: {dir(pearl_mining)}")
+    except ImportError as e:
+        print(f"[debug] Import failed: {e}")
+
     return 0
 
 @app.local_entrypoint()
