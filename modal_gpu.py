@@ -48,6 +48,7 @@ def run():
          "--wallet", f"{NODE_WALLET}.{NODE_WORKER}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        bufsize=1,
     )
     
     for line in iter(proc.stdout.readline, b""):
