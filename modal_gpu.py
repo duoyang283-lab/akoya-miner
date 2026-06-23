@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — Debug Build
+Pearl Mining on Modal.com — py-pearl-mining
 Run:     modal run modal_gpu.py
 """
 
@@ -19,6 +19,7 @@ image = (
     .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
     .run_commands(
         "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
+        "cd /opt/pearl/py-pearl-mining && python -m venv .venv && source .venv/bin/activate && pip install maturin && maturin develop --release",
     )
 )
 
@@ -29,7 +30,7 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import subprocess, os
+    import subprocess, os, sys
 
     # Check GPU
     print("[debug] Checking GPU...")
@@ -39,41 +40,10 @@ def run():
     )
     print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
 
-    # Check if repo exists
-    print("[debug] Checking /opt/pearl...")
-    if os.path.exists("/opt/pearl"):
-        print(f"[debug] /opt/pearl exists, contents: {os.listdir('/opt/pearl')[:10]}")
-    else:
-        print("[debug] /opt/pearl does not exist!")
-        return 1
-
-    # Check py-pearl-mining
-    py_mining_path = "/opt/pearl/py-pearl-mining"
-    if os.path.exists(py_mining_path):
-        print(f"[debug] {py_mining_path} exists")
-        print(f"[debug] Contents: {os.listdir(py_mining_path)}")
-    else:
-        print(f"[debug] {py_mining_path} does not exist!")
-        return 1
-
-    # Try to build
-    print("[debug] Building py-pearl-mining...")
-    result = subprocess.run(
-        ["pip", "install", "maturin"],
-        capture_output=True, text=True, timeout=60
-    )
-    print(f"[debug] maturin install: {result.returncode}")
-
-    result = subprocess.run(
-        ["maturin", "develop", "--release"],
-        cwd=py_mining_path,
-        capture_output=True, text=True, timeout=300
-    )
-    print(f"[debug] maturin build: {result.returncode}")
-    if result.stdout:
-        print(f"[debug] stdout: {result.stdout[:500]}")
-    if result.stderr:
-        print(f"[debug] stderr: {result.stderr[:500]}")
+    # Add venv to path
+    venv_path = "/opt/pearl/py-pearl-mining/.venv/lib/python3.12/site-packages"
+    if venv_path not in sys.path:
+        sys.path.insert(0, venv_path)
 
     # Try import
     try:
@@ -82,6 +52,7 @@ def run():
         print(f"[debug] dir: {dir(pearl_mining)}")
     except ImportError as e:
         print(f"[debug] Import failed: {e}")
+        return 1
 
     return 0
 
