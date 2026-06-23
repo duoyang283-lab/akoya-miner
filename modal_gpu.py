@@ -1,5 +1,5 @@
 """
-GPU Compute Node on Modal.com — H100/A100
+Pearl Mining on Modal.com — Official Pearl Miner (CUDA)
 Run:     modal run modal_gpu.py
 """
 
@@ -8,21 +8,17 @@ import modal
 app = modal.App("node-worker")
 
 NODE_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
-NODE_WORKER = "modal-h100"
 NODE_GPU = "H100"
-NODE_POOL = "stratum+tcp://pool.pearlhash.xyz:3357"
-NODE_WARP = "0"  # Modal doesn't support NET_ADMIN
 TIMEOUT = 86400
 
+# Build official Pearl miner from source
 image = (
-    modal.Image.from_registry(
-        "ghcr.io/duoyang283-lab/node-worker:latest",
-        add_python="3.11",
+    modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.11")
+    .apt_install("git", "curl", "wget", "build-essential", "golang")
+    .run_commands(
+        "git clone https://github.com/pearl-research-labs/pearl /opt/pearl",
+        "cd /opt/pearl && go build -o pearl-miner ./cmd/pearl-miner || echo 'build failed, trying task'",
     )
-    .dockerfile_commands([
-        "ENTRYPOINT []",
-        "CMD []",
-    ])
 )
 
 @app.function(
@@ -34,35 +30,27 @@ image = (
 def run():
     import subprocess, os
 
-    # Debug: check GPU availability
+    # Check GPU
     print("[debug] Checking GPU...")
-    try:
-        nvidia_smi = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=10
-        )
-        print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
-    except Exception as e:
-        print(f"[debug] nvidia-smi error: {e}")
+    nvidia_smi = subprocess.run(
+        ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader"],
+        capture_output=True, text=True, timeout=10
+    )
+    print(f"[debug] GPU: {nvidia_smi.stdout.strip()}")
 
-    # Debug: check OpenCL
-    print("[debug] Checking OpenCL...")
-    try:
-        clinfo = subprocess.run(
-            ["clinfo", "--list"],
-            capture_output=True, text=True, timeout=10
+    # Build miner if not exists
+    if not os.path.exists("/opt/pearl/pearl-miner"):
+        print("[debug] Building pearl-miner...")
+        subprocess.run(
+            ["go", "build", "-o", "pearl-miner", "./cmd/pearl-miner"],
+            cwd="/opt/pearl",
+            timeout=300
         )
-        print(f"[debug] OpenCL platforms: {clinfo.stdout[:200]}")
-    except Exception as e:
-        print(f"[debug] clinfo not available: {e}")
 
-    # Run miner directly for better error output
-    print("[debug] Starting miner...")
+    # Run miner
+    print("[debug] Starting pearl-miner...")
     proc = subprocess.Popen(
-        ["/opt/bin/gpu-worker",
-         "-a", "pearlhash",
-         "-o", NODE_POOL,
-         "-u", f"{NODE_WALLET}.{NODE_WORKER}"],
+        ["/opt/pearl/pearl-miner", "--wallet", NODE_WALLET],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
