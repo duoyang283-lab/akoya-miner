@@ -1,5 +1,5 @@
 """
-Pearl Mining on Modal.com — Continuous Mining
+Pearl Mining on Modal.com — SRBMiner + Kryptex Pool
 Run:     modal run modal_gpu.py
 """
 
@@ -11,21 +11,20 @@ NODE_GPU = "H100"
 TIMEOUT = 86400
 
 image = (
-    modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
-    .apt_install("git", "curl", "wget", "build-essential", "pkg-config", "libssl-dev")
+    modal.Image.from_registry("nvidia/cuda:12.8.1-base-ubuntu24.04")
+    .apt_install("curl", "wget", "tar", "xz-utils", "ocl-icd-libopencl1", "pciutils")
     .run_commands(
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
-    )
-    .env({"PATH": "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
-    .run_commands(
-        "pip install maturin",
-        "git clone --depth 1 https://github.com/pearl-research-labs/pearl /opt/pearl",
-        "cd /opt/pearl/py-pearl-mining && maturin build --release",
-    )
-    .run_commands(
-        "cd /opt/pearl/py-pearl-mining && pip install target/wheels/*.whl",
+        "mkdir -p /etc/OpenCL/vendors && echo 'libnvidia-opencl.so.1' > /etc/OpenCL/vendors/nvidia.icd",
+        # Download SRBMiner-MULTI
+        "wget -q https://github.com/doktor83/SRBMiner-MULTI/releases/download/2.6.4/SRBMiner-MULTI-2-6-4-Linux.tar.xz -O /tmp/srbminer.tar.xz",
+        "cd /opt && tar -xf /tmp/srbminer.tar.xz && mv SRBMiner-MULTI-* srbminer && chmod +x srbminer/SRBMiner-MULTI",
+        "rm /tmp/srbminer.tar.xz",
     )
 )
+
+NODE_WALLET = "prl1pyzmnrl9f2wrna4wxnmaz92k05ep8fz6tfxdtzvsj56k0kheph5hs04lfac"
+NODE_WORKER = "modal-h100"
+NODE_POOL = "stratum+tcp://prl.kryptex.network:7048"
 
 @app.function(
     gpu=NODE_GPU,
@@ -34,55 +33,27 @@ image = (
     scaledown_window=300,
 )
 def run():
-    import pearl_mining as pm
-    import time, hashlib, struct
+    import subprocess
 
-    print("[miner] Starting Pearl mining on H100...", flush=True)
-    
-    # Mining config
-    k = 1024
-    rank = 32
-    m, n = 128, 128
-    rows_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
-    cols_pattern = pm.PeriodicPattern.from_list([0, 1, 2, 3])
-    mining_config = pm.MiningConfiguration(
-        common_dim=k,
-        rank=rank,
-        mma_type=pm.MMAType.Int7xInt7ToInt32,
-        rows_pattern=rows_pattern,
-        cols_pattern=cols_pattern,
-        moe=None,
+    print("[miner] Starting SRBMiner-MULTI...", flush=True)
+    print(f"[miner] Pool: {NODE_POOL}", flush=True)
+    print(f"[miner] Wallet: {NODE_WALLET}", flush=True)
+    print(f"[miner] Worker: {NODE_WORKER}", flush=True)
+
+    proc = subprocess.Popen(
+        ["/opt/srbminer/SRBMiner-MULTI",
+         "--disable-cpu",
+         "--algorithm", "pearlhash",
+         "--pool", NODE_POOL,
+         "--wallet", f"{NODE_WALLET}.{NODE_WORKER}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     
-    count = 0
-    start = time.time()
+    for line in iter(proc.stdout.readline, b""):
+        print(line.decode().strip(), flush=True)
     
-    while True:
-        # Generate unique block header each iteration
-        timestamp = int(time.time())
-        nonce = struct.pack('<Q', count)
-        prev_hash = hashlib.sha256(nonce).digest()
-        merkle_root = hashlib.sha256(prev_hash + nonce).digest()
-        
-        header = pm.IncompleteBlockHeader(
-            version=1,
-            prev_block=prev_hash,
-            merkle_root=merkle_root,
-            timestamp=timestamp,
-            nbits=0x207FFFFF,
-        )
-        
-        # Mine
-        proof = pm.mine(m, n, k, header, mining_config)
-        count += 1
-        
-        # Stats every 100 proofs
-        if count % 100 == 0:
-            elapsed = time.time() - start
-            rate = count / elapsed
-            print(f"[miner] Proofs: {count} | Rate: {rate:.1f}/s | Time: {elapsed:.1f}s", flush=True)
-    
-    return 0
+    return proc.wait()
 
 @app.local_entrypoint()
 def main():
