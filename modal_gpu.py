@@ -11,7 +11,7 @@ NODE_GPU = "H100"
 TIMEOUT = 86400
 
 image = (
-    modal.Image.from_registry("nvidia/cuda:12.8.1-base-ubuntu24.04")
+    modal.Image.from_registry("nvidia/cuda:12.8.1-base-ubuntu24.04", add_python="3.12")
     .apt_install("curl", "wget", "tar", "xz-utils", "ocl-icd-libopencl1", "pciutils")
     .run_commands(
         "mkdir -p /etc/OpenCL/vendors && echo 'libnvidia-opencl.so.1' > /etc/OpenCL/vendors/nvidia.icd",
