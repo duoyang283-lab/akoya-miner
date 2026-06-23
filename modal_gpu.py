@@ -16,9 +16,9 @@ image = (
     .run_commands(
         "mkdir -p /etc/OpenCL/vendors && echo 'libnvidia-opencl.so.1' > /etc/OpenCL/vendors/nvidia.icd",
         # Download SRBMiner-MULTI
-        "wget -q https://github.com/doktor83/SRBMiner-MULTI/releases/download/2.6.4/SRBMiner-MULTI-2-6-4-Linux.tar.xz -O /tmp/srbminer.tar.xz",
-        "cd /opt && tar -xf /tmp/srbminer.tar.xz && mv SRBMiner-MULTI-* srbminer && chmod +x srbminer/SRBMiner-MULTI",
-        "rm /tmp/srbminer.tar.xz",
+        "wget -q https://github.com/doktor83/SRBMiner-Multi/releases/download/3.3.9/SRBMiner-Multi-3-3-9-Linux.tar.gz -O /tmp/srbminer.tar.gz",
+        "cd /opt && tar -xf /tmp/srbminer.tar.gz && mv SRBMiner-Multi-* srbminer && chmod +x srbminer/SRBMiner-MULTI",
+        "rm /tmp/srbminer.tar.gz",
     )
 )
 
